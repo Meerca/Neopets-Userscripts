@@ -46,7 +46,7 @@
 
         content += `</ul>`;
     } else {
-        content = `<p><b>No stocks are currently available between ${minPurchase} and ${closestCurrent} NP. :(`;
+        content = `<p><b>No stocks are currently available between ${minPurchase} and ${closestCurrent} NP. :(</b></p>`;
     }
 
     var container = document.createElement('div');
