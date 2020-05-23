@@ -2,8 +2,8 @@
 // @name         Neopets: Show Best Bargain Stocks
 // @namespace    https://nikkidelrosso.com/
 // @version      0.1
-// @description  Shows a list of the best priced stocks on the Neopets bargain stocks page.
-// @author       Nikki DelRosso
+// @description  Shows a list of the best priced stocks on the Neopets bargain stocks page
+// @author       You
 // @match        http*://www.neopets.com/stockmarket.phtml?type=list&bargain=true*
 // @grant        none
 // ==/UserScript==
@@ -12,7 +12,7 @@
     'use strict';
 
     var stocksTable = document.querySelector('.content table');
-    var cheapest;
+    var cheapest = [];
     var minPurchase = 15;
     var closestCurrent = 20;
 
@@ -46,7 +46,7 @@
 
         content += `</ul>`;
     } else {
-        content = `<p><b>No stocks are currently available between ${minPurchase} and ${closestCurrent} NP. :(</b></p>`;
+        content = `<p><b>No stocks are currently available between ${minPurchase} and ${closestCurrent} NP. :(`;
     }
 
     var container = document.createElement('div');
