@@ -1,7 +1,7 @@
 # Neopets Userscripts
 This is a set of basic scripts to help out with UI enhancements on various parts of Neopets. Use at your own risk. I can't guarantee that Neopets won't take issue with you using these scripts.
 
-As with any script provided by somebody, I highly recommend that you *look through the source code* yourself to make sure there's nothing that will put your account at risk.
+As with any script provided by somebody else, I highly recommend that you *look through the source code* yourself to make sure there's nothing that will put your account at risk.
 
 ## Prerequisites
 Confirmed to work in Chrome.  Not tested in other browsers.
