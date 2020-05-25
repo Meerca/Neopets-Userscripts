@@ -6,6 +6,7 @@
 // @author       You
 // @match        http*://www.neopets.com/stockmarket.phtml?type=list&bargain=true*
 // @grant        none
+// @updateURL    https://github.com/Nikker/Neopets-Userscripts/raw/master/bargain-stocks.user.js
 // ==/UserScript==
 
 (function() {
