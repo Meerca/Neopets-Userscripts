@@ -7,6 +7,7 @@
 // @include        http://www.neopets.com/stockmarket.phtml?type=portfolio
 // @grant          GM_getValue
 // @grant          GM_setValue
+// @updateURL      https://github.com/Nikker/Neopets-Userscripts/raw/master/stock-highlighter.user.js
 // ==/UserScript==
 
 (function() {
