@@ -14,5 +14,5 @@ With Tampermonkey or Greasemonkey installed, click on any of the links below to 
 - [Show stock price on purchase page](https://github.com/Nikker/Neopets-Userscripts/raw/master/stock-price.user.js)
 
 **Training**
-- [Click here to install the training helper](https://github.com/Nikker/Neopets-Userscripts/raw/master/training-helper.user.js)
+- [Training helper](https://github.com/Nikker/Neopets-Userscripts/raw/master/training-helper.user.js)
  
