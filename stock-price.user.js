@@ -7,6 +7,7 @@
 // @include      http*://www.neopets.com/stockmarket.phtml?type=buy*
 // @include      http*://www.neopets.com/stockmarket.phtml?ticker=*&type=buy*
 // @grant        none
+// @updateURL    https://github.com/Nikker/Neopets-Userscripts/raw/master/stock-price.user.js
 // ==/UserScript==
 
 (function() {
