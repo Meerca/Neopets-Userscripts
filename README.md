@@ -1,9 +1,15 @@
 # Neopets Userscripts
+This is a set of basic scripts to help out with UI enhancements on various parts of Neopets. 
 
 ## Prerequisites
 Confirmed to work in Chrome.  Not tested in other browsers.
 
-1) Install the Tapermonkey plugin. (Greasemonkey is also available in Firefox instead of Tampermonkey.)
+**Chrome**
+* Install the [Tapermonkey extension](https://chrome.google.com/webstore/detail/tampermonkey/dhdgffkkebhmkfjojejmpbldmpobfkfo) from the Chrome Web Store. 
+
+**Firefox** 
+* Install either the [Greasemonkey](https://addons.mozilla.org/en-US/firefox/addon/greasemonkey/) or [Tampermonkey](https://addons.mozilla.org/en-US/firefox/addon/tampermonkey/) add-on.
+* Please note: **these scripts have not been tested on Firefox.**
 
 ## Script Installation
 With Tampermonkey or Greasemonkey installed, click on any of the links below to install or update a script.
