@@ -7,6 +7,7 @@
 // @match        http://www.neopets.com/island/fight_training.phtml?type=status
 // @match        http://www.neopets.com/island/training.phtml?type=status
 // @grant        unsafeWindow
+// @updateURL    https://github.com/Nikker/Neopets-Userscripts/raw/master/training-helper.user.js
 // ==/UserScript==
 /* jshint -W097 */
 'use strict';
