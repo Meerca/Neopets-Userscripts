@@ -14,7 +14,7 @@
     'use strict';
 
     const numberOfShares = 1000;
-    const minBuyPrice = 15;
+    const minBuyPrice = 15; // todo: detect this from the page, it says the min price above the purchase form
     
     const updatedEveryMinutes = 30; // how often Neopets stock prices update
     const loadTime = new Date();
