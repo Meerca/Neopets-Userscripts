@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Neopets: Display Stock Price
 // @namespace    https://nikkidelrosso.com
-// @version      0.1.1
+// @version      0.2.1
 // @description  Displays the price of Neopets stocks on the purchase page, and pre-fill the number of shares to max.
 // @author       Nikki DelRosso
 // @include      http*://www.neopets.com/stockmarket.phtml?type=buy*
@@ -15,8 +15,12 @@
 
     const numberOfShares = 1000;
     const minBuyPrice = 15;
+    const updatedEveryMinutes = 5;
+    const stalenessInterval = 1000 * 60; // 1 minute
+    const tickerInfoInterval = 1000 * 60 * 5; // 5 minutes
     const purchaseForm = document.querySelector('form[action="process_stockmarket.phtml"]');
-    // const tickerMarquee = document.getElementsByTagName('marquee')[0];
+    const loadTime = new Date();
+    let refreshTimeout = false;
 
     const div = document.createElement('div');
 
@@ -31,6 +35,8 @@
 
         displayTickerInfo();
         purchaseForm.ticker_symbol.addEventListener('change', displayTickerInfo);
+        // when re-entering tab, since the page is most likely to be stale then
+        document.addEventListener('visibilitychange', displayTickerInfo);
     }
 
     function getTickerEntry(ticker) {
@@ -45,9 +51,38 @@
         return m.groups;
     }
 
+    function getTimeDiffMinutes() {
+        const timeNow = new Date();
+        const diffMs = timeNow.getTime() - loadTime.getTime();
+        return Math.floor(diffMs / 1000 / 60);
+    }
+
+    function checkStaleness() {
+        const minutesStale = getTimeDiffMinutes();
+        if (minutesStale >= updatedEveryMinutes) {
+            div.style.color = 'red';
+            div.style.cursor = 'pointer';
+            div.innerHTML = `<strong>❗ Refresh the page ❗</strong><br><small><em>${minutesStale} minutes since prices updated</em><small>`;
+            div.addEventListener('click', function() { location.reload() });
+            return true;
+        }
+
+        return false;
+    }
+
     function displayTickerInfo() {
-        let ticker = purchaseForm.ticker_symbol.value;
-        let tickerEntry = getTickerEntry(ticker);
+        if (refreshTimeout) {
+            clearTimeout(refreshTimeout);
+        }
+
+        if (checkStaleness()) {
+            return;
+        }
+
+        const ticker = purchaseForm.ticker_symbol.value;
+        const tickerEntry = getTickerEntry(ticker);
+        const sinceMinutes = getTimeDiffMinutes();
+        const timeSince = sinceMinutes == 0? "just now" : `${sinceMinutes} minute${sinceMinutes == 1? '' : 's'} ago`;
 
         if (!ticker) {
             div.innerHTML = "";
@@ -80,7 +115,10 @@
             div.title = "Nice! This stock is the same as the minimum purchase price.";
         }
 
-        div.innerHTML = `<b>${emoji}Cost: ${tickerEntry.price} NP</b> ${emoji}<br><small><em>For ${ticker} on page load</em></small>`;
+        div.innerHTML = `<strong>${emoji} Cost: ${tickerEntry.price} NP</strong> ${emoji}<br><small><em>for ${ticker} ${timeSince}</em></small>`;
+
+        refreshTimeout = setTimeout(displayTickerInfo, tickerInfoInterval);
+
         return true;
     }
 
