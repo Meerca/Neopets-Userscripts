@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Neopets: Display Stock Price
 // @namespace    https://nikkidelrosso.com
-// @version      0.2.1
+// @version      0.2.2
 // @description  Displays the price of Neopets stocks on the purchase page, and pre-fill the number of shares to max.
 // @author       Nikki DelRosso
 // @include      http*://www.neopets.com/stockmarket.phtml?type=buy*
@@ -15,11 +15,11 @@
 
     const numberOfShares = 1000;
     const minBuyPrice = 15;
-    const updatedEveryMinutes = 5;
-    const stalenessInterval = 1000 * 60; // 1 minute
-    const tickerInfoInterval = 1000 * 60 * 5; // 5 minutes
+    const updatedEveryMinutes = 30; // how often Neopets stock prices update
     const purchaseForm = document.querySelector('form[action="process_stockmarket.phtml"]');
     const loadTime = new Date();
+    
+    const refreshInterval = 1000 * 60 * 5; // 5 minutes
     let refreshTimeout = false;
 
     const div = document.createElement('div');
@@ -117,7 +117,7 @@
 
         div.innerHTML = `<strong>${emoji} Cost: ${tickerEntry.price} NP</strong> ${emoji}<br><small><em>for ${ticker} ${timeSince}</em></small>`;
 
-        refreshTimeout = setTimeout(displayTickerInfo, tickerInfoInterval);
+        refreshTimeout = setTimeout(displayTickerInfo, refreshInterval);
 
         return true;
     }
