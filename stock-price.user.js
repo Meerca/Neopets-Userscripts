@@ -15,13 +15,13 @@
 
     const numberOfShares = 1000;
     const minBuyPrice = 15;
-    const updatedEveryMinutes = 30; // how often Neopets stock prices update
-    const purchaseForm = document.querySelector('form[action="process_stockmarket.phtml"]');
-    const loadTime = new Date();
     
+    const updatedEveryMinutes = 30; // how often Neopets stock prices update
+    const loadTime = new Date();
     const refreshInterval = 1000 * 60 * 5; // 5 minutes
     let refreshTimeout = false;
 
+    const purchaseForm = document.querySelector('form[action="process_stockmarket.phtml"]');
     const div = document.createElement('div');
 
     function init() {
