@@ -1,12 +1,12 @@
 // ==UserScript==
 // @name         Neopets: Show Best Bargain Stocks
-// @namespace    https://nikkidelrosso.com/
+// @author       Hiddenist
+// @namespace    https://hiddenist.com
 // @version      0.1
 // @description  Shows a list of the best priced stocks on the Neopets bargain stocks page
-// @author       You
 // @match        http*://www.neopets.com/stockmarket.phtml?type=list&bargain=true*
 // @grant        none
-// @updateURL    https://github.com/Nikker/Neopets-Userscripts/raw/master/bargain-stocks.user.js
+// @updateURL    https://github.com/Meerca/Neopets-Userscripts/raw/main/bargain-stocks.user.js
 // ==/UserScript==
 
 (function() {

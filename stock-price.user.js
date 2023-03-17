@@ -1,13 +1,13 @@
 // ==UserScript==
 // @name         Neopets: Display Stock Price
-// @namespace    https://nikkidelrosso.com
+// @author       Hiddenist
+// @namespace    https://hiddenist.com
 // @version      0.2.2
 // @description  Displays the price of Neopets stocks on the purchase page, and pre-fill the number of shares to max.
-// @author       Nikki DelRosso
 // @include      http*://www.neopets.com/stockmarket.phtml?type=buy*
 // @include      http*://www.neopets.com/stockmarket.phtml?ticker=*&type=buy*
 // @grant        none
-// @updateURL    https://github.com/Nikker/Neopets-Userscripts/raw/master/stock-price.user.js
+// @updateURL    https://github.com/Meerca/Neopets-Userscripts/raw/main/stock-price.user.js
 // ==/UserScript==
 
 (function() {

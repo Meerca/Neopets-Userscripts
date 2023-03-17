@@ -1,13 +1,13 @@
 // ==UserScript==
 // @name         Neopets Training Helper
-// @author       Nikki DelRosso
-// @namespace    http://nikkidelrosso.com/
+// @author       Hiddenist
+// @namespace    https://hiddenist.com
 // @version      0.6.1
 // @description  Makes codestone training your pet require fewer clicks and less math. Now with notifications when training is complete!
 // @match        http://www.neopets.com/island/fight_training.phtml?type=status
 // @match        http://www.neopets.com/island/training.phtml?type=status
 // @grant        unsafeWindow
-// @updateURL    https://github.com/Nikker/Neopets-Userscripts/raw/master/training-helper.user.js
+// @updateURL    https://github.com/Meerca/Neopets-Userscripts/raw/main/training-helper.user.js
 // ==/UserScript==
 /* jshint -W097 */
 'use strict';

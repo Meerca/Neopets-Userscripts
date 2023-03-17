@@ -1,13 +1,13 @@
 // ==UserScript==
-// @name           Neopets Stock Highlighter
-// @version        1.2.1
-// @author         Nikki DelRosso
-// @namespace      http://nikkidelrosso.com/
-// @description    Highlights Neopets stocks which are high enough to sell. Also sorts the list of stocks, and makes the UI a little nicer. Now with configurable settings!
-// @include        http://www.neopets.com/stockmarket.phtml?type=portfolio
-// @grant          GM_getValue
-// @grant          GM_setValue
-// @updateURL      https://github.com/Nikker/Neopets-Userscripts/raw/master/stock-highlighter.user.js
+// @name         Neopets Stock Highlighter
+// @author       Hiddenist
+// @namespace    https://hiddenist.com
+// @version      1.2.1
+// @description  Highlights Neopets stocks which are high enough to sell. Also sorts the list of stocks, and makes the UI a little nicer. Now with configurable settings!
+// @include      http://www.neopets.com/stockmarket.phtml?type=portfolio
+// @grant        GM_getValue
+// @grant        GM_setValue
+// @updateURL    https://github.com/Meerca/Neopets-Userscripts/raw/main/stock-highlighter.user.js
 // ==/UserScript==
 
 (function() {
