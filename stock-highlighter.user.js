@@ -4,7 +4,7 @@
 // @namespace    https://hiddenist.com
 // @version      1.2.1
 // @description  Highlights Neopets stocks which are high enough to sell. Also sorts the list of stocks, and makes the UI a little nicer. Now with configurable settings!
-// @include      http://www.neopets.com/stockmarket.phtml?type=portfolio
+// @include      http*://www.neopets.com/stockmarket.phtml?type=portfolio
 // @grant        GM_getValue
 // @grant        GM_setValue
 // @updateURL    https://github.com/Meerca/Neopets-Userscripts/raw/main/stock-highlighter.user.js
