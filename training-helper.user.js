@@ -4,8 +4,8 @@
 // @namespace    https://hiddenist.com
 // @version      0.6.1
 // @description  Makes codestone training your pet require fewer clicks and less math. Now with notifications when training is complete!
-// @match        http://www.neopets.com/island/fight_training.phtml?type=status
-// @match        http://www.neopets.com/island/training.phtml?type=status
+// @match        http*://www.neopets.com/island/fight_training.phtml?type=status
+// @match        http*://www.neopets.com/island/training.phtml?type=status
 // @grant        unsafeWindow
 // @updateURL    https://github.com/Meerca/Neopets-Userscripts/raw/main/training-helper.user.js
 // ==/UserScript==
