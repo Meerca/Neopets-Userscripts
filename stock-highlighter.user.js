@@ -2,12 +2,15 @@
 // @name         Neopets Stock Highlighter
 // @author       Hiddenist
 // @namespace    https://hiddenist.com
-// @version      1.2.1
+// @version      1.2.2
 // @description  Highlights Neopets stocks which are high enough to sell. Also sorts the list of stocks, and makes the UI a little nicer. Now with configurable settings!
-// @include      http*://www.neopets.com/stockmarket.phtml?type=portfolio
+// @match        https://www.neopets.com/stockmarket.phtml?type=portfolio
+// @match        http://www.neopets.com/stockmarket.phtml?type=portfolio
 // @grant        GM_getValue
 // @grant        GM_setValue
 // @updateURL    https://github.com/Meerca/Neopets-Userscripts/raw/main/stock-highlighter.user.js
+// @downloadURL  https://github.com/Meerca/Neopets-Userscripts/raw/main/stock-highlighter.user.js
+// @supportURL   https://github.com/Meerca/Neopets-Userscripts/issues
 // ==/UserScript==
 
 (function() {
