@@ -2,12 +2,14 @@
 // @name         Neopets: Display Stock Price
 // @author       Hiddenist
 // @namespace    https://hiddenist.com
-// @version      0.2.2
+// @version      0.2.3
 // @description  Displays the price of Neopets stocks on the purchase page, and pre-fill the number of shares to max.
-// @include      http*://www.neopets.com/stockmarket.phtml?type=buy*
-// @include      http*://www.neopets.com/stockmarket.phtml?ticker=*&type=buy*
+// @match        http*://www.neopets.com/stockmarket.phtml?type=buy*
+// @match        http*://www.neopets.com/stockmarket.phtml?ticker=*&type=buy*
 // @grant        none
 // @updateURL    https://github.com/Meerca/Neopets-Userscripts/raw/main/stock-price.user.js
+// @downloadURL  https://github.com/Meerca/Neopets-Userscripts/raw/main/stock-price.user.js
+// @supportURL  https://github.com/Meerca/Neopets-Userscripts/issues
 // ==/UserScript==
 
 (function() {
@@ -15,7 +17,7 @@
 
     const numberOfShares = 1000;
     const minBuyPrice = 15; // todo: detect this from the page, it says the min price above the purchase form
-    
+
     const updatedEveryMinutes = 30; // how often Neopets stock prices update
     const loadTime = new Date();
     const refreshInterval = 1000 * 60 * 5; // 5 minutes
