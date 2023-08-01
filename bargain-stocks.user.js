@@ -2,9 +2,9 @@
 // @name         Neopets: Show Best Bargain Stocks
 // @author       Hiddenist
 // @namespace    https://hiddenist.com
-// @version      0.1
+// @version      0.2
 // @description  Shows a list of the best priced stocks on the Neopets bargain stocks page
-// @match        http*://www.neopets.com/stockmarket.phtml?type=list&bargain=true*
+// @match        http*://www.neopets.com/stockmarket.phtml?type=list*
 // @grant        none
 // @updateURL    https://github.com/Meerca/Neopets-Userscripts/raw/main/bargain-stocks.user.js
 // ==/UserScript==
