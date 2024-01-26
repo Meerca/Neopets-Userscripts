@@ -26,14 +26,15 @@ Sorts your stock portfolio with stocks listed by value, including configurable o
 <img style="width: 400px; max-width: 45%;" alt="Portfolio view" src="https://user-images.githubusercontent.com/563879/160717689-022387c2-e5ed-42bf-a640-808512d07c41.png"> <img style="width: 400px; max-width: 45%;" alt="Settings" src="https://user-images.githubusercontent.com/563879/160717551-5b7ad85f-b0f0-4df8-ba85-8d73ae5c42f7.png">
 
 ### Bargain Stocks Helper
-Adds a list of stocks from the bargain stocks page that are at 15 NP.
+Adds a list of stocks that are at the minimum purchase price. This shows up on all stock pages as long as the ticker marquee is at the top of the page.
+
+The default minimum price is 15 NP, but can be configured.
 
 [![Install the Bargain Stocks Helper](https://img.shields.io/static/v1?label=&message=Install+Bargain+Stocks+Helper&color=2ea44f&style=for-the-badge)](https://github.com/Meerca/Neopets-Userscripts/raw/main/bargain-stocks.user.js)
 <sup>(requires [Tampermokney](https://chrome.google.com/webstore/detail/tampermonkey/dhdgffkkebhmkfjojejmpbldmpobfkfo))</sup>
 
 #### Screenshots
-<img style="width: 400px; max-width: 100%" alt="image" src="https://user-images.githubusercontent.com/563879/160718002-96c736ed-e011-4f32-ac51-3bd582a5fb98.png">
-
+<img style="width: 400px; max-width: 100%" alt="image" src="screenshots/bargain-stocks-helper-v1.png">
 
 ### Stock Purchase Helper
 Shows the price of the stock you're buying on the purchase page
