@@ -49,7 +49,7 @@ Shows the price of the stock you're buying on the purchase page
 ### Training Helper
 Makes codestone training your pet require fewer clicks and less math. Will send browser notifications training is complete.
 
-[![Install the Training Helper](https://img.shields.io/static/v1?label=&message=Install+Bargain+Stocks+Helper&color=bbe026&style=for-the-badge)](https://github.com/Meerca/Neopets-Userscripts/raw/main/training-helper.user.js)
+[![Install the Training Helper](https://img.shields.io/static/v1?label=&message=Install+Training+Helper&color=bbe026&style=for-the-badge)](https://github.com/Meerca/Neopets-Userscripts/raw/main/training-helper.user.js)
 <sup>(requires [Tampermokney](https://chrome.google.com/webstore/detail/tampermonkey/dhdgffkkebhmkfjojejmpbldmpobfkfo))</sup>
 
 
