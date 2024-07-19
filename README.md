@@ -17,6 +17,12 @@ You may also be able to use this on other browsers using Tampermonkey or Greasem
 
 ## The Scripts
 
+- [Stock Highlighter](#stock-highlighter): Cleans up your Stock Portfolio
+- [Bargain Stocks Helper](#bargain-stocks-helper): Helps you find stocks to purchase for the day
+- [Stock Purchase Helper](#stock-purchase-helper): Helps you make sure you're purchasing the right stocks at the right price
+- [Fancy Quickstock](#fancy-quickstock): Adds item images and info the the Quickstock page
+- [Training Helper](#training-helper): Helps you track when your pet will be done with codestone or dubloon training
+
 ### Stock Highlighter
 
 Sorts your stock portfolio with stocks listed by value, including configurable options to set your sell point, highlight color, etc. Also moves the PIN entry for selling stocks to the top of the screen.
@@ -72,6 +78,6 @@ Gathers data from your inventory page, so that when you visit the quick stock pa
 Makes codestone training your pet require fewer clicks and less math. Will send browser notifications training is complete.
 
 [![Install the Training Helper](https://img.shields.io/static/v1?label=&message=Install+Training+Helper&color=bbe026&style=for-the-badge)](https://github.com/Meerca/Neopets-Userscripts/raw/main/training-helper.user.js)
-<sup>(requires [Tampermokney](https://chrome.google.com/webstore/detail/tampermonkey/dhdgffkkebhmkfjojejmpbldmpobfkfo))</sup>
+<sup>(requires [Tampermonkey](https://chrome.google.com/webstore/detail/tampermonkey/dhdgffkkebhmkfjojejmpbldmpobfkfo))</sup>
 
 > Disclaimer: This script has not been tested in quite a number of years!
