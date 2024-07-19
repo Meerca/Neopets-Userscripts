@@ -2,11 +2,12 @@
 // @name         Neopets: Show Best Bargain Stocks
 // @author       Hiddenist
 // @namespace    https://hiddenist.com
-// @version      1.0
+// @version      1.1
 // @description  Shows a list of the best priced stocks on any of the stock market pages
 // @match        http*://www.neopets.com/stockmarket.phtml*
 // @grant        none
 // @updateURL    https://github.com/Meerca/Neopets-Userscripts/raw/main/bargain-stocks.user.js
+// @downloadURL  https://github.com/Meerca/Neopets-Userscripts/raw/main/bargain-stocks.user.js
 // ==/UserScript==
 
 (function() {
@@ -15,7 +16,7 @@
     function main() {
         customElements.define("bargain-stocks-list", BargainStocksListElement);
         const list = new BargainStocksListElement();
-        const sibling = document.querySelector("td.content > div:not([style~=float]) > center");
+        const sibling = document.querySelector("td.content > div:not([style~=float]) > center, td.content > center");
 
         if (!sibling) {
             console.warn("Unable to find somewhere to put the bargain stocks list.")
