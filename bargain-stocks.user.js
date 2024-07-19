@@ -8,6 +8,7 @@
 // @grant        none
 // @updateURL    https://github.com/Meerca/Neopets-Userscripts/raw/main/bargain-stocks.user.js
 // @downloadURL  https://github.com/Meerca/Neopets-Userscripts/raw/main/bargain-stocks.user.js
+// @supportURL   https://github.com/Meerca/Neopets-Userscripts/issues
 // ==/UserScript==
 
 (function() {
