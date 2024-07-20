@@ -8,6 +8,8 @@
 // @match        http*://www.neopets.com/island/training.phtml?type=status
 // @grant        unsafeWindow
 // @updateURL    https://github.com/Meerca/Neopets-Userscripts/raw/main/training-helper.user.js
+// @downloadURL  https://github.com/Meerca/Neopets-Userscripts/raw/main/training-helper.user.js
+// @supportURL   https://github.com/Meerca/Neopets-Userscripts/issues
 // ==/UserScript==
 /* jshint -W097 */
 'use strict';
