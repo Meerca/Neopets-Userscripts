@@ -270,6 +270,10 @@
         }
     }
 
+    function hasNeopetsPremium() {
+        return document.querySelector("#sswmenu") !== null;
+    }
+
     function parseRows(rows, skip, groupSize) {
         var rowGroups = {};
         var percentages = [];
@@ -309,23 +313,36 @@
         };
     }
 
+    function getPinEntryTable() {
+        try {
+            return (
+                document.getElementById("pin_field")?.parentNode.parentNode.parentNode.parentNode
+            );
+        } catch (e) {
+            console.error("Error getting PIN table, you might not have a PIN configured on your account", e);
+            return null;
+        }
+    }
+
     /**
      * @param {HTMLTableElement} stocksTable
      */
     function moveSellButton(stocksTable) {
         // Put the sell and pin fields at the top of the table
         const sellInput = document.getElementById("show_sell");
-        const pinTable =
-            document.getElementById("pin_field").parentNode.parentNode
-                .parentNode.parentNode;
+        const pinTable = getPinEntryTable();
 
-        stocksTable.parentNode.insertBefore(pinTable, stocksTable);
+        if (pinTable) {
+            stocksTable.parentNode.insertBefore(pinTable, stocksTable);
+            pinTable.style.marginBottom = "16px";
+            pinTable.style.marginTop = "16px";
+        } else {
+            stocksTable.style.marginTop = "32px";
+        }
         stocksTable.parentNode.insertBefore(sellInput, stocksTable);
 
-        pinTable.style.marginBottom = "15px";
-        pinTable.style.marginTop = "15px";
-        sellInput.style.marginTop = "15px";
-        sellInput.style.marginBottom = "15px";
+        sellInput.style.marginTop = "16px";
+        sellInput.style.marginBottom = "16px";
     }
 
     /**
@@ -366,9 +383,11 @@
      */
     function cleanupTableStyles(stocksTable) {
         const stocksRows = stocksTable.querySelectorAll("tbody tr");
-        // this breaks some stuff in premium, I don't remember what it's supposed to be doing instead
-        // content.querySelector("div").remove();
-        // content.querySelector("div").style.width = "100%";
+        if (!hasNeopetsPremium()) {
+            const content = document.querySelector("#content td.content");
+            content.querySelector("div").remove();
+            content.querySelector("div").style.width = "100%";
+        }
         stocksTable.setAttribute("border", "0");
         stocksTable.style.width = "100%";
         for (const r in stocksRows) {
