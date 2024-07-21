@@ -2,7 +2,7 @@
 // @name         Neopets Stock Highlighter
 // @author       Hiddenist
 // @namespace    https://hiddenist.com
-// @version      1.2.2
+// @version      2024-07-20
 // @description  Highlights Neopets stocks which are high enough to sell. Also sorts the list of stocks, and makes the UI a little nicer. Now with configurable settings!
 // @match        https://www.neopets.com/stockmarket.phtml?type=portfolio
 // @match        http://www.neopets.com/stockmarket.phtml?type=portfolio
@@ -86,7 +86,7 @@
     }
 
     function addSettingsForm() {
-        var content = objectByClass('content', 'td', document.getElementById("content"));
+        const content = document.querySelector("#content td.content");
 
         var s = document.createElement('div');
         s.setAttribute('id', 'stockHighlight_Settings');
@@ -119,7 +119,6 @@
             addSetting(s, set);
         }
     }
-
 
     function addSetting(form, item) {
         var wrap = document.createElement('div');
@@ -235,18 +234,10 @@
     }
 
     function modifyTable() {
-        // Get the first #content .content:
-        var content = objectByClass('content', 'td', document.getElementById("content"));
-
-        // get the tbody of the table we want
-        var stocksTable = content.getElementsByTagName('table')[0];
-        var stocksBody = stocksTable.getElementsByTagName('tbody')[0];
-        var stocksRows = stocksBody.rows;
-
-        var parsed = parseRows(stocksRows, settings.headerRows, settings.rowGroupSize);
+        const stocksTable = document.querySelector("#postForm table");
 
         if (settings.sortRows) {
-            sortRows(stocksBody, parsed.percentages, parsed.groups);
+            sortRows(stocksTable);
         }
 
         if (settings.moveSellButton) {
@@ -254,20 +245,7 @@
         }
 
         if (settings.styleTweaks) {
-            content.querySelector('div').remove();
-            content.querySelector('div').style.width = '100%';
-            stocksTable.setAttribute('border', '0');
-            stocksTable.style.width = "100%";
-            for (var r in stocksRows) {
-                for (var c in stocksRows[r].cells) {
-                    var cell = stocksRows[r].cells[c];
-
-                    if (cell && cell.style) {
-                        cell.style.borderBottom = "1px solid rgba(20,20,20,0.2)";
-                        cell.style.padding = "7px 0";
-                    }
-                }
-            }
+            cleanupTableStyles(stocksTable);
         }
     }
 
@@ -291,46 +269,6 @@
             setRowColors(row, hl.default);
         }
     }
-
-    // Get objects with a particular class name, and optionally specify which tag and which container to search within.
-    // Last parameter is a function which determines the stopping condition and takes the current list of objects found.
-    function objectsByClass(className, tag, container, stop) {
-        if (!tag) {
-            tag = '*';
-        }
-
-        if (!container) {
-            container = document;
-        }
-
-        if (typeof stop != 'function') {
-            stop = function(_) { return false; };
-        }
-
-        var tags = container.getElementsByTagName(tag);
-        var ret = [];
-
-        for (var i in tags) {
-            if (tags[i].className.indexOf(className) != -1) {
-                ret.push(tags[i]);
-
-                if (stop(ret)) {
-                    break;
-                }
-            }
-        }
-
-        return ret;
-    }
-
-    function objectByClass(className, tag, container) {
-        var o = objectsByClass(className, tag, container, function (list) { return true; });
-
-        if (o.length > 0) {
-            return o[0];
-        }
-    }
-
 
     function parseRows(rows, skip, groupSize) {
         var rowGroups = {};
@@ -371,10 +309,15 @@
         };
     }
 
+    /**
+     * @param {HTMLTableElement} stocksTable
+     */
     function moveSellButton(stocksTable) {
         // Put the sell and pin fields at the top of the table
-        var sellInput = document.getElementById('show_sell');
-        var pinTable = document.getElementById('pin_field').parentNode.parentNode.parentNode.parentNode;
+        const sellInput = document.getElementById("show_sell");
+        const pinTable =
+            document.getElementById("pin_field").parentNode.parentNode
+                .parentNode.parentNode;
 
         stocksTable.parentNode.insertBefore(pinTable, stocksTable);
         stocksTable.parentNode.insertBefore(sellInput, stocksTable);
@@ -385,24 +328,56 @@
         sellInput.style.marginBottom = "15px";
     }
 
-    function sortRows(stocksTable, percentages, groups) {
+    /**
+     * @param {HTMLTableElement} stocksTable
+     */
+    function sortRows(stocksTable) {
+        const stocksRows = stocksTable.querySelectorAll("tbody tr");
+        const { percentages, groups } = parseRows(
+            stocksRows,
+            settings.headerRows,
+            settings.rowGroupSize
+        );
+        const tableBody = stocksTable.getElementsByTagName("tbody")[0];
         // Sort numbers descending
-        percentages = percentages.sort(function(a, b) {
+        const sortedPercentages = percentages.sort(function (a, b) {
             return a - b;
         });
 
         // Go through the percentages in descending order and sort the rows
-        for (var i in percentages) {
-            var percentage = percentages[i];
-            var g = groups[percentage];
+        for (var i in sortedPercentages) {
+            const percentage = sortedPercentages[i];
+            const g = groups[percentage];
 
-            for (var j in g) {
-                var group = g[j];
+            for (const j in g) {
+                const group = g[j];
 
                 for (var k = group.length - 1; k >= 0; --k) {
-                    var row = group[k];
-                    stocksTable.removeChild(row);
-                    stocksTable.replaceChild(row, stocksTable.insertRow(2));
+                    const row = group[k];
+                    tableBody.removeChild(row);
+                    tableBody.replaceChild(row, tableBody.insertRow(2));
+                }
+            }
+        }
+    }
+
+    /**
+     * @param {HTMLTableElement} stocksTable
+     */
+    function cleanupTableStyles(stocksTable) {
+        const stocksRows = stocksTable.querySelectorAll("tbody tr");
+        // this breaks some stuff in premium, I don't remember what it's supposed to be doing instead
+        // content.querySelector("div").remove();
+        // content.querySelector("div").style.width = "100%";
+        stocksTable.setAttribute("border", "0");
+        stocksTable.style.width = "100%";
+        for (const r in stocksRows) {
+            for (const c in stocksRows[r].cells) {
+                const cell = stocksRows[r].cells[c];
+
+                if (cell && cell.style) {
+                    cell.style.borderBottom = "1px solid rgba(20,20,20,0.2)";
+                    cell.style.padding = "7px 0";
                 }
             }
         }
