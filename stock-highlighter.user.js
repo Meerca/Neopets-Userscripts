@@ -2,7 +2,7 @@
 // @name         Neopets Stock Highlighter
 // @author       Hiddenist
 // @namespace    https://hiddenist.com
-// @version      2024-07-20
+// @version      2024-07-20-patch1
 // @description  Highlights Neopets stocks which are high enough to sell. Also sorts the list of stocks, and makes the UI a little nicer. Now with configurable settings!
 // @match        https://www.neopets.com/stockmarket.phtml?type=portfolio
 // @match        http://www.neopets.com/stockmarket.phtml?type=portfolio
@@ -235,9 +235,10 @@
 
     function modifyTable() {
         const stocksTable = document.querySelector("#postForm table");
+        const stocksRows = document.querySelectorAll("#postForm > table > tbody > tr");
 
         if (settings.sortRows) {
-            sortRows(stocksTable);
+            sortRows(stocksRows);
         }
 
         if (settings.moveSellButton) {
@@ -348,14 +349,12 @@
     /**
      * @param {HTMLTableElement} stocksTable
      */
-    function sortRows(stocksTable) {
-        const stocksRows = stocksTable.querySelectorAll("tbody tr");
+    function sortRows(stocksRows) {
         const { percentages, groups } = parseRows(
             stocksRows,
             settings.headerRows,
             settings.rowGroupSize
         );
-        const tableBody = stocksTable.getElementsByTagName("tbody")[0];
         // Sort numbers descending
         const sortedPercentages = percentages.sort(function (a, b) {
             return a - b;
@@ -371,8 +370,9 @@
 
                 for (var k = group.length - 1; k >= 0; --k) {
                     const row = group[k];
-                    tableBody.removeChild(row);
-                    tableBody.replaceChild(row, tableBody.insertRow(2));
+                    const parent = row.parentNode;
+                    parent.removeChild(row);
+                    parent.replaceChild(row, parent.insertRow(2));
                 }
             }
         }
