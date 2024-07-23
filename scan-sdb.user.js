@@ -19,35 +19,12 @@
 
   const isCataloging = GM_getValue("isCataloging", false);
   const scanDate = GM_getValue("scanDate", null);
+
   main();
 
-  var cancelCatalogingCommand;
-  if (isCataloging) {
-    cancelCatalogingCommand = GM_registerMenuCommand(
-      "Cancel Cataloging",
-      () => {
-        GM_setValue("isCataloging", false);
-      }
-    );
-  } else if (scanDate) {
-    GM_registerMenuCommand("Print Report", () => {
-      const date = new Date(scanDate).toLocaleDateString();
-      alert(
-        `View the developer console in your browser to see the report from your last scan on ${date}.`
-      );
-      console.log("Scan date:");
-      printItemReport();
-    });
-  }
-
-  GM_registerMenuCommand("Start Cataloging", () => {
-    saveItemData({});
-    GM_setValue("scanDate", null);
-    GM_setValue("isCataloging", true);
-    window.location = "https://www.neopets.com/safetydeposit.phtml";
-  });
-
   async function main() {
+    const menuCommands = addMenuCommands();
+
     if (!isCataloging) {
       return;
     }
@@ -63,10 +40,46 @@
 
       printItemReport();
 
-      if (cancelCatalogingCommand) {
-        GM_unregisterMenuCommand(cancelCatalogingCommand);
+      if (menuCommands.cancelCatalogingCommand) {
+        GM_unregisterMenuCommand(menuCommands.cancelCatalogingCommand);
       }
     }
+  }
+
+  function addMenuCommands() {
+    const menuCommands = {
+      cancelCataloging: null,
+      printItemReport: null,
+      startCataloging: GM_registerMenuCommand("Start Cataloging", () => {
+        saveItemData({});
+        GM_setValue("scanDate", null);
+        GM_setValue("isCataloging", true);
+        window.location = "https://www.neopets.com/safetydeposit.phtml";
+      }),
+    };
+
+    if (isCataloging) {
+      menuCommands.cancelCataloging = GM_registerMenuCommand(
+        "Cancel Cataloging",
+        () => {
+          GM_setValue("isCataloging", false);
+        }
+      );
+    } else if (scanDate) {
+      menuCommands.printItemReport = GM_registerMenuCommand(
+        "Print Report",
+        () => {
+          const date = new Date(scanDate).toLocaleDateString();
+          alert(
+            `View the developer console in your browser to see the report from your last scan on ${date}.`
+          );
+          console.log("Scan date:");
+          printItemReport();
+        }
+      );
+    }
+
+    return menuCommands;
   }
 
   function printItemReport() {
@@ -99,16 +112,16 @@
     return true;
   }
 
-  function appendItemData(items) {
-    saveItemData({ ...loadItemData(), ...items });
-  }
-
   function saveItemData(items) {
     GM_setValue("items", JSON.stringify(items));
   }
 
   function loadItemData() {
     return JSON.parse(GM_getValue("items", "{}"));
+  }
+
+  function appendItemData(items) {
+    saveItemData({ ...loadItemData(), ...items });
   }
 
   function readItems() {
