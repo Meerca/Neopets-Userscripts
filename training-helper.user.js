@@ -2,8 +2,8 @@
 // @name         Neopets Training Helper
 // @author       Hiddenist
 // @namespace    https://hiddenist.com
-// @version      0.6.1
-// @description  Makes codestone training your pet require fewer clicks and less math. Now with notifications when training is complete!
+// @version      2024-07-24
+// @description  Makes codestone training your pet require fewer clicks and less math.
 // @match        http*://www.neopets.com/island/fight_training.phtml?type=status
 // @match        http*://www.neopets.com/island/training.phtml?type=status
 // @grant        unsafeWindow
@@ -314,30 +314,46 @@ function getStartForm(pet_name, selected) {
 	);
 }
 
-function getShopWizForm(item) {
-	var shopWizForm = $(
-/*jshint multistr: true*/
-'<form method="get" action="/market.phtml">\
-  <input type="hidden" name="type" value="wizard">\
-  <input type="hidden" name="string" value="' + item + '">\
-  <input type="submit" value="Find ' + item + '">\
-</form>'
-	);
+function searchShopWiz(searchTerm) {
+	const ssw = document.getElementById('sswmenu');
+	if (!ssw) {
+		return searchRegularShopWiz(searchTerm);
+	}
+	
+	if (!ssw.querySelector('.sswdrop')?.checkVisibility()) {
+		ssw.querySelector('.imgmenu').click();
+	}
+	ssw.querySelector('#searchstr').value = searchTerm;
+	ssw.querySelector('#ssw-criteria').value = 'exact';
+	ssw.querySelector('#button-search').click();
+}
 
-	shopWizForm.submit(function(e) {
-		var ssw = $('#sswmenu');
-		if (ssw.length) {
-			e.preventDefault();
-			if (ssw.find('.sswdrop').is(':hidden')) {
-				ssw.find('.imgmenu').click();
-			}
-			ssw.find('#searchstr').val(item);
-			ssw.find('#ssw-criteria').val('exact');
-			ssw.find('#button-search').click();
-		}
-	});
+function searchRegularShopWiz(searchTerm) {
+	window.open(`/shops/wizard.phtml?string=${encodeURIComponent(searchTerm)}`);
+}
 
-	return shopWizForm;
+function searchSdb(searchTerm) {
+	window.open(`/safetydeposit.phtml?obj_name=${encodeURIComponent(searchTerm)}`);
+}
+
+function getItemSearchForm(itemName) {
+	const buttonContainer = document.createElement('div');
+	buttonContainer.style.display = "grid";
+	buttonContainer.style.gap = "16px";
+	buttonContainer.style.margin = "16px auto";
+	buttonContainer.style.maxWidth = "150px";
+
+	const sdbButton = document.createElement('button');
+	sdbButton.textContent = "Search SDB";
+	sdbButton.addEventListener('click', () => searchSdb(itemName));
+	buttonContainer.append(sdbButton);
+
+	const wizbutton = document.createElement('button');
+	wizbutton.textContent = "Shop Wiz";
+	wizbutton.addEventListener('click', () => searchShopWiz(itemName));
+	buttonContainer.append(wizbutton);
+
+	return buttonContainer;
 }
 
 function getCompleteForm( pet_name ) {
@@ -431,7 +447,7 @@ $('tr:contains("is currently studying") + tr > td:contains("Time till course fin
 $('p b:contains("Codestone")').each(function() {
 	var codestone = $(this).text();
 	$(this).next('img').css('margin-bottom','10px');
-	$(this).after(getShopWizForm(codestone));
+	$(this).after(getItemSearchForm(codestone));
 });
 
 if (Notification.permission !== "granted") Notification.requestPermission();
