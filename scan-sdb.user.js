@@ -19,6 +19,9 @@
 
   const isCataloging = GM_getValue("isCataloging", false);
   const scanDate = GM_getValue("scanDate", null);
+  const config = {
+    savePageSource: false,
+  };
 
   main();
 
@@ -29,6 +32,7 @@
       return;
     }
     await waitUntilLoaded();
+    if (config.savePageSource) savePageSource();
     appendItemData(readItems());
 
     if (!nextPage()) {
@@ -48,11 +52,8 @@
 
   function addMenuCommands() {
     const menuCommands = {
-      cancelCataloging: null,
-      printItemReport: null,
       startCataloging: GM_registerMenuCommand("Start Cataloging", () => {
-        saveItemData({});
-        GM_setValue("scanDate", null);
+        resetSavedData();
         GM_setValue("isCataloging", true);
         window.location = "https://www.neopets.com/safetydeposit.phtml";
       }),
@@ -77,6 +78,19 @@
           printItemReport();
         }
       );
+
+      if (config.savePageSource) {
+        menuCommands.printSource = GM_registerMenuCommand(
+          "Print Source",
+          () => {
+            alert(
+              "View the developer console in your browser to see the source of all scanned pages"
+            );
+            console.log("Page source:");
+            console.log(GM_getValue("pageSource"));
+          }
+        );
+      }
     }
 
     return menuCommands;
@@ -112,6 +126,12 @@
     return true;
   }
 
+  function resetSavedData() {
+    saveItemData({});
+    GM_setValue("scanDate", null);
+    GM_setValue("pageSource", "");
+  }
+
   function saveItemData(items) {
     GM_setValue("items", JSON.stringify(items));
   }
@@ -122,6 +142,12 @@
 
   function appendItemData(items) {
     saveItemData({ ...loadItemData(), ...items });
+  }
+
+  function savePageSource() {
+    const source = document.documentElement.outerHTML;
+    const previousSource = GM_getValue("pageSource", "");
+    GM_setValue("pageSource", previousSource + source);
   }
 
   function readItems() {
