@@ -481,5 +481,22 @@
     $(this).after(getItemSearchForm(codestone));
   });
 
-  if (Notification.permission !== "granted") Notification.requestPermission();
+  if (Notification.permission !== "granted") {
+    var button = document.createElement("button");
+    button.textContent = "Enable Notifications for Training Helper";
+    button.style.fontSize = "1.5em";
+    button.style.margin = "16px auto";
+    button.onclick = function () {
+      Notification.requestPermission().then((result) => {
+        if (result === "granted") {
+          new Notification("Notifications enabled!", {
+            body: "You will now receive notifications from the Training Helper.",
+          });
+          button.remove();
+        }
+      });
+    };
+
+    document.querySelector("td.content p").prepend(button);
+  }
 })();
