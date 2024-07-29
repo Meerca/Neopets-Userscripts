@@ -2,7 +2,7 @@
 // @name         Neopets Training Helper
 // @author       Hiddenist
 // @namespace    https://hiddenist.com
-// @version      2024-07-24
+// @version      2024-07-28
 // @description  Makes codestone training your pet require fewer clicks and less math.
 // @match        http*://www.neopets.com/island/fight_training.phtml?type=status
 // @match        http*://www.neopets.com/island/training.phtml?type=status
@@ -21,7 +21,6 @@
     agility: 201,
     endurance: Number.MAX_SAFE_INTEGER,
   };
-  var playSound = true;
 
   var $ = unsafeWindow.jQuery;
 
@@ -105,14 +104,8 @@
   }
   var scriptname = window.location.pathname.split("/").pop();
 
-  var sound = document.createElement("audio");
-  sound.src =
-    "https://dl.dropboxusercontent.com/s/6fjsg7f7sfp3coz/Gentle%20Roll.mp3";
-  sound.preload = "auto";
-
   var notification = null;
   function sendNotification(title, body, petName) {
-    if (playSound && sound.paused) sound.play();
     $("title").html(title);
 
     if (notification) {
@@ -488,5 +481,22 @@
     $(this).after(getItemSearchForm(codestone));
   });
 
-  if (Notification.permission !== "granted") Notification.requestPermission();
+  if (Notification.permission !== "granted") {
+    var button = document.createElement("button");
+    button.textContent = "Enable Notifications for Training Helper";
+    button.style.fontSize = "1.5em";
+    button.style.margin = "16px auto";
+    button.onclick = function () {
+      Notification.requestPermission().then((result) => {
+        if (result === "granted") {
+          new Notification("Notifications enabled!", {
+            body: "You will now receive notifications from the Training Helper.",
+          });
+          button.remove();
+        }
+      });
+    };
+
+    document.querySelector("td.content p").prepend(button);
+  }
 })();
