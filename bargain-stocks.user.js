@@ -2,7 +2,7 @@
 // @name         Neopets: Show Best Bargain Stocks
 // @author       Hiddenist
 // @namespace    https://hiddenist.com
-// @version      1.1
+// @version      2024-07-29
 // @description  Shows a list of the best priced stocks on any of the stock market pages
 // @match        http*://www.neopets.com/stockmarket.phtml*
 // @grant        none
@@ -57,7 +57,10 @@
         }
 
         get minPrice() {
-            const defaultMinPrice = 15;
+            const hasCheaperByTheDozen =
+              document.querySelector(".perkBar") != null;
+            const defaultMinPrice = hasCheaperByTheDozen ? 10 : 15;
+
             return this._getNumericAttributeValue("minPrice") || defaultMinPrice;
         }
 
