@@ -12,7 +12,7 @@
 // @supportURL  https://github.com/Meerca/Neopets-Userscripts/issues
 // ==/UserScript==
 
-(function() {
+(function () {
   ("use strict");
 
   const numberOfShares = 1000;
