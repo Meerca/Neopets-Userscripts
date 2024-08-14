@@ -9,13 +9,14 @@
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=neopets.com
 // @grant        GM_getValue
 // @grant        GM_setValue
+// @grant        GM_deleteValue
 // @updateURL    https://github.com/Meerca/Neopets-Userscripts/raw/main/quickstock.user.js
 // @downloadURL  https://github.com/Meerca/Neopets-Userscripts/raw/main/quickstock.user.js
 // @supportURL   https://github.com/Meerca/Neopets-Userscripts/issues
 // ==/UserScript==
 
 (function () {
-  "use strict";
+  ("use strict");
 
   const options = {
     debug: false,
@@ -37,7 +38,7 @@
       });
     } else if (isQuickStockPage()) {
       debug("Adding images to quickstock...");
-      addImagesToQuickStock();
+      handleQuickStockPage();
       debug("Finished adding images to quickstock.");
     }
   }
@@ -127,19 +128,26 @@
     return value ? JSON.parse(value) : null;
   }
 
-  function addImagesToQuickStock() {
-    const items = getQuickstockItems();
+  function handleQuickStockPage() {
+    const items = getQuickStockItems();
+    // todo: condense items that are the same into an exanpandable row
+    // todo: add shift-click to select multiple items
     items.forEach(addImageToQuickstockItem);
+    items.forEach(addRememberCheckbox);
+  }
+
+  function getQuickStockForm() {
+    return document.forms.quickstock;
   }
 
   /**
-   * @typedef {QuickstockItem}
+   * @typedef {Object} QuickStockItem
    * @property {string} name
    * @property {ItemData} itemData
    * @property {HTMLTableRowElement} row
-   * @property {QuickStockCheckboxes} checkboxes
+   * @property {QuickStockLocations} locations
    *
-   * @typedef {QuickStockCheckboxes}
+   * @typedef {Object} QuickStockLocations
    * @property {HTMLInputElement?} stock
    * @property {HTMLInputElement?} deposit
    * @property {HTMLInputElement?} donate
@@ -147,11 +155,12 @@
    * @property {HTMLInputElement?} gallery
    * @property {HTMLInputElement?} closet
    * @property {HTMLInputElement?} shed
+   * @property {string?} currentLocation
    *
-   * @returns {QuickstockItem[]}
+   * @returns {QuickStockItem[]}
    */
-  function getQuickstockItems() {
-    const form = document.forms.quickstock;
+  function getQuickStockItems() {
+    const form = getQuickStockForm();
 
     if (!form) {
       if (isQuickStockPage()) {
@@ -167,31 +176,35 @@
     rows.forEach((row) => {
       const name = row.querySelector("td").textContent.trim();
       const itemData = loadItemData(name);
-      const checkboxes = getCheckboxes(row);
+      const locations = getLocationRadioButtons(name, row);
 
-      items.push({ name, itemData, row, checkboxes });
+      items.push({ name, itemData, row, locations });
     });
 
     return items;
   }
 
   /**
+   * @param {string} name The name of the item
    * @param {HTMLTableRowElement} row
-   * @returns {QuickStockCheckboxes}
+   * @returns {QuickStockLocations}
    */
-  function getCheckboxes(row) {
+  function getLocationRadioButtons(name, row) {
     const checkboxes = {};
 
     const inputs = row.querySelectorAll("input[type='radio']");
     inputs.forEach((input) => {
       checkboxes[input.value] = input;
+      if (input.value === GM_getValue(`remember[${name}]`, "")) {
+        input.checked = true;
+      }
     });
 
     return checkboxes;
   }
 
   /**
-   * @param {QuickstockItem} item
+   * @param {QuickStockItem} item
    */
   function addImageToQuickstockItem(item) {
     const { itemData, row } = item;
@@ -230,5 +243,89 @@
 
     firstCell.innerHTML = "";
     firstCell.append(image, textContainer);
+  }
+
+  function getClosestParent(element, type) {
+    while (element && element.tagName !== type.toUpperCase()) {
+      element = element.parentElement;
+    }
+
+    return element;
+  }
+
+  /**
+   * @param {QuickStockItem} item
+   */
+  function addRememberCheckbox(item) {
+    const { name, row, locations } = item;
+
+    const table = getClosestParent(row, "table");
+
+    if (table) {
+      const headerCell = document.createElement("th");
+      headerCell.className = "fancy-quickstock-remember";
+      headerCell.textContent = "Remember choice";
+      headerCell.style.fontSize = "0.6em";
+      table
+        .querySelectorAll("th:last-child:not(.fancy-quickstock-remember)")
+        .forEach((cell) => cell.after(headerCell));
+    }
+
+    if (row.querySelector(".fancy-quickstock-remember")) {
+      return;
+    }
+
+    const rememberKey = `remember[${name}]`;
+    let currentLocation = GM_getValue(rememberKey, null);
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.checked = currentLocation != null;
+    checkbox.addEventListener("change", (event) => {
+      if (event.target.checked) {
+        GM_setValue(rememberKey, currentLocation ?? "");
+      } else {
+        GM_deleteValue(rememberKey);
+      }
+    });
+
+    const addListenerToLocation = (locationElement) => {
+      if (!locationElement) {
+        return;
+      }
+      locationElement.addEventListener("change", (event) => {
+        const location = event.target.value;
+        const checked = event.target.checked;
+
+        if (checked) {
+          currentLocation = location;
+          if (checkbox.checked) {
+            GM_setValue(rememberKey, location);
+          }
+        }
+      });
+      locationElement.addEventListener("dblclick", (event) => {
+        if (event.target.value === currentLocation) {
+          currentLocation = null;
+          GM_deleteValue(rememberKey);
+          checkbox.checked = false;
+        }
+      });
+    };
+
+    addListenerToLocation(locations.stock);
+    addListenerToLocation(locations.deposit);
+    addListenerToLocation(locations.donate);
+    addListenerToLocation(locations.discard);
+    addListenerToLocation(locations.gallery);
+    addListenerToLocation(locations.closet);
+    addListenerToLocation(locations.shed);
+
+    const td = document.createElement("td");
+    td.className = "fancy-quickstock-remember";
+    td.align = "center";
+
+    td.append(checkbox);
+
+    row.append(td);
   }
 })();
