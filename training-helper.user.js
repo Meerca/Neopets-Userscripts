@@ -361,13 +361,11 @@
     }
 
     var nextHpLevel = Math.max(Math.ceil(stats.endurance / 2), nextLevel);
-    const maxValue = (nextLevel - 1) * 2;
+    let maxValue = (nextLevel - 1) * 2;
     const nextNextLevel = getNextCourseLevel(nextHpLevel);
 
     if (stat == "endurance") {
       maxValue = (nextNextLevel - 3) * 2; // Leave three levels in case of accidental level increases or bonus stats
-    } else {
-      maxValue = (nextLevel - 1) * 2;
     }
 
     // console.log(stat, maxValue, currentValue + 2);
