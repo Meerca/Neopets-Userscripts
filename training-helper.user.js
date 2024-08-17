@@ -6,55 +6,62 @@
 // @description  Makes codestone training your pet require fewer clicks and less math.
 // @match        http*://www.neopets.com/island/fight_training.phtml*
 // @match        http*://www.neopets.com/island/training.phtml*
+// @match        http*://www.neopets.com/pirates/academy.phtml*
 // @grant        unsafeWindow
 // @updateURL    https://github.com/Meerca/Neopets-Userscripts/raw/main/training-helper.user.js
 // @downloadURL  https://github.com/Meerca/Neopets-Userscripts/raw/main/training-helper.user.js
 // @supportURL   https://github.com/Meerca/Neopets-Userscripts/issues
 // ==/UserScript==
 (function () {
-  "use strict";
+  ("use strict");
 
-  // You can change these settings!
-  var maxTraining = {
-    strength: 750,
-    defence: 750,
-    agility: 201,
-    endurance: Number.MAX_SAFE_INTEGER,
+  // Maximum level for each stat.
+  // todo: Add configuration to allow specifying these values
+  const maxTraining = {
+    strength: 750, // Does nothing after 750
+    defence: 750, // Does nothing after 750
+    agility: 201, // Not useful after 201, only used for equipping certain items
+    endurance: Infinity,
   };
-
-  var $ = unsafeWindow.jQuery;
-  var scriptname = window.location.pathname.split("/").pop();
-  var notification = null;
+  
+  const DEBUG = false;
 
   // These are the levels at which more codestones need to be used.
   // Note: I skip the level 250 switch to the secret school, because it's better
   // to jump directly into that instead of training up HP at 8 codestones a point for HP.
-  var courseLevels = [21, 41, 81, 101, 121, 151, 201, 300, 400, 500, 600, 750];
+
+  // todo: Update for dubloons
+  const courseLevels = [
+    21, 41, 81, 101, 121, 151, 201, 300, 400, 500, 600, 750,
+  ];
 
   function main() {
     if (!isStatusPage()) {
       return;
     }
 
-    getStudyingRows().forEach((row) => {
+    getPetTrainingInfo().forEach((row) => {
       if (row.isCourseActive) {
         addNotificationListener(row);
         row.countdowns.forEach(startCountdown);
+      } else {
+        row.trainingCost.forEach(({ element }) => {
+          if (element.nextSibling && element.nextSibling.tagName === "IMG") {
+            element.nextSibling.style = { marginBottom: "10px" };
+          }
+          element.append(getItemSearchForm(element.textContent));
+        });
       }
     });
 
-    $('form[action="process_' + scriptname + '"]').submit(submitComplete);
+    if (isSecretSchool()) {
+      document
+        .querySelector(`form[action="process_${getScriptName()}"]`)
+        ?.addEventListener("submit", submitComplete);
+    }
 
-    $('b:contains("is not on a course")').each(function () {
-      var pet = $(this).text().split(" ")[0];
-      var container = $(this).closest("tr").next("tr").children("td").last();
-      container.append(getStartForm(pet, getNextStat(container.prev("td"))));
-    });
-
-    $('p b:contains("Codestone")').each(function () {
-      var codestone = $(this).text();
-      $(this).next("img").css("margin-bottom", "10px");
-      $(this).after(getItemSearchForm(codestone));
+    getPetNotTrainingInfo().forEach(({ petName, trainingCell, nextStat }) => {
+      trainingCell.append(getStartForm(petName, nextStat));
     });
 
     addRequestNotificationButton();
@@ -63,6 +70,14 @@
   function isStatusPage() {
     const query = new URLSearchParams(window.location.search);
     return query.get("type") === "status";
+  }
+
+  function isSecretSchool() {
+    return window.location.pathname === "/island/fight_training.phtml";
+  }
+
+  function getScriptName() {
+    return window.location.pathname.split("/").pop();
   }
 
   function trainingCost(level) {
@@ -118,12 +133,12 @@
   function simulate(stats, runs) {
     if (typeof runs == "undefined") runs = 100;
 
-    var totalCost = { time: 0, redStones: 0, tanStones: 0 };
+    const totalCost = { time: 0, redStones: 0, tanStones: 0 };
 
-    for (var i = 0; i < runs; ++i) {
-      var next = calculateNextStat(stats);
+    for (let i = 0; i < runs; ++i) {
+      const next = calculateNextStat(stats);
 
-      var cost = trainingCost(stats.level);
+      const cost = trainingCost(stats.level);
       totalCost.time += cost.hours;
       if (cost.type == "advanced") {
         totalCost.redStones += cost.codestones;
@@ -139,52 +154,81 @@
     console.log("Raised " + runs + " stats.  Cost:", totalCost);
   }
 
-  function sendNotification(title, body, petName) {
-    $("title").html(title);
+  function sendNotification(
+    title,
+    {
+      body,
+      petName = undefined,
+      previousNotification = null,
+      idleCheckId = null,
+      previousTitle = document.title,
+    }
+  ) {
+    document.title = title;
 
-    if (notification) {
+    if (Notification.permission !== "granted") return;
+
+    if (previousNotification) {
+      previousNotification.close();
+    }
+
+    const notification = new Notification(title, {
+      icon:
+        petName &&
+        "http://pets.neopets.com/cpn/" + petName.toLowerCase() + "/1/1.png",
+      body: body,
+    });
+
+    if (!idleCheckId) {
+      idleCheckId = setReturnFromIdleReminder(() => {
+        sendNotification(title, {
+          body,
+          petName,
+          previousNotification: notification,
+          idleCheckId,
+          previousTitle,
+        });
+      });
+    }
+
+    // the page does not reopen when clicking the notification if the browser tab was closed
+    // We can listen on the homepage of neopets and check something like this to reopen the page if we want
+    // GM_setValue("notificationUrl", window.location.href);
+
+    notification.onclick = () => {
+      // GM_deleteValue("notificationUrl");
+      if (idleCheckId) clearInterval(idleCheckId);
       notification.close();
-    }
-
-    if (Notification.permission !== "granted") Notification.requestPermission();
-    else {
-      notification = new Notification(title, {
-        icon:
-          "http://pets.neopets.com/cpn/" + petName.toLowerCase() + "/1/1.png",
-        body: body,
-      });
-
-      var idleCheck = setIdleReminder(function () {
-        sendNotification(title, body, petName);
-      });
-
-      notification.onclick = function (x) {
-        window.focus();
-        clearInterval(idleCheck);
-        this.close();
-        notification = null;
-      };
-    }
+      document.title = previousTitle;
+    };
   }
 
-  // Runs a callback if a machine returns from idle.
-  function setIdleReminder(cb, interval, threshold) {
-    if (typeof interval == "undefined") interval = 1000 * 60;
-    if (typeof threshold == "undefined") threshold = 1000 * 60;
-    var lastRan = new Date();
-    var idleCheck = setInterval(function () {
-      var now = new Date();
-      var passed = now.getTime() - lastRan.getTime();
-      lastRan = now;
-      if (passed > interval + threshold) {
-        cb();
+  /**
+   * Runs a callback if a machine returns from idle.
+   * @param {function} onReturnFromIdleDetected - Callback to run when the machine returns from idle.
+   * @param {number} intervalInMs - How often to check for idle in milliseconds.
+   * @param {number} idleThresholdInMs - How long the machine must be idle before running the callback.
+   */
+  function setReturnFromIdleReminder(
+    onReturnFromIdleDetected,
+    intervalInMs = 1000 * 60,
+    idleThresholdInMs = 1000 * 60
+  ) {
+    let intervalLastChecked = new Date();
+
+    return setInterval(function () {
+      const now = new Date();
+      const timePassedSinceLastInterval =
+        now.getTime() - intervalLastChecked.getTime();
+      intervalLastChecked = now;
+      if (timePassedSinceLastInterval > intervalInMs + idleThresholdInMs) {
+        onReturnFromIdleDetected();
       }
-    }, interval);
-    return idleCheck;
+    }, intervalInMs);
   }
 
   function getFormObject(form) {
-    var data = $(form).find(":input").serializeArray();
+    var data = unsafeWindow.jQuery(form).find(":input").serializeArray();
     var postData = {};
     for (var i in data) {
       postData[data[i].name] = data[i].value;
@@ -209,7 +253,7 @@
         }
         stats[stat] += points;
 
-        var b = $(td).find("b");
+        var b = unsafeWindow.jQuery(td).find("b");
         var e = {
           level: b.eq(0),
           strength: b.eq(1),
@@ -239,8 +283,9 @@
   }
 
   function getNextStat(td, increased) {
-    var statText = td.text();
+    var statText = td.textContent;
     function getStat(abbr) {
+      // why did I do this what even is this
       var regex = new RegExp(abbr + "\\s*:\\s*(?:\\d+\\s*\\/\\s*)?(\\d+)", "i");
       var m = statText.match(regex);
       if (m) {
@@ -264,56 +309,63 @@
     return calculateNextStat(stats);
   }
 
+  // todo: This is garbage that I need to rewrite, thanks past me
   function calculateNextStat(stats) {
     var nextLevel = getNextCourseLevel(stats.level);
 
-    var minStat = null;
-    var maxStat = null;
-    for (var stat in stats) {
-      var value = stats[stat];
-      if (!maxStat || value > stats[maxStat]) {
+    // Find the maximum and minimum valued stats
+    let minStat = null;
+    let maxStat = null;
+    for (let stat in stats) {
+      let currentStatValue = stats[stat];
+      if (!maxStat || currentStatValue > stats[maxStat]) {
         maxStat = stat;
       }
 
-      if (stat == "level" || maxTraining[stat] <= value) {
+      if (stat == "level" || maxTraining[stat] <= currentStatValue) {
         continue;
       }
 
-      if (!minStat || value < stats[minStat]) {
+      if (!minStat || currentStatValue < stats[minStat]) {
         minStat = stat;
       }
     }
 
     //console.log(minStat, maxStat, stats.level*2, canTrain(minStat, stats), canTrain('endurance', stats));
 
-    if (canTrain(minStat, stats) && stats[maxStat] <= stats.level * 2) {
+    const mustTrainLevel = stats[maxStat] > stats.level * 2;
+
+    if (canTrain(minStat, stats) && !mustTrainLevel) {
+      // train our minimum value stat if we can
       return minStat;
-    } else if (
+    }
+
+    // I feel like this is prioritizing endurance too much right now, I want to keep a safer margin
+    if (
       canTrain("endurance", stats) &&
-      (maxStat == "endurance" || stats[maxStat] <= stats.level * 2)
+      (maxStat == "endurance" || !mustTrainLevel)
     ) {
       return "endurance";
-    } else {
-      return "level";
     }
+
+    return "level";
   }
 
   // Check whether or not a stat is possible and safe to train
   function canTrain(stat, stats) {
-    var currentValue = stats[stat],
-      nextLevel = getNextCourseLevel(stats.level),
-      maxValue;
+    const currentValue = stats[stat];
+    const nextLevel = getNextCourseLevel(stats.level);
 
-    if (maxTraining[stat] <= currentValue) {
+    if (currentValue >= maxTraining[stat]) {
       return false;
     }
 
     var nextHpLevel = Math.max(Math.ceil(stats.endurance / 2), nextLevel);
-    var nextNextLevel = getNextCourseLevel(nextHpLevel);
-    var maxHp = (nextNextLevel - 3) * 2;
+    const maxValue = (nextLevel - 1) * 2;
+    const nextNextLevel = getNextCourseLevel(nextHpLevel);
 
     if (stat == "endurance") {
-      maxValue = maxHp; // Leave three levels in case of accidental level increases or bonus stats
+      maxValue = (nextNextLevel - 3) * 2; // Leave three levels in case of accidental level increases or bonus stats
     } else {
       maxValue = (nextLevel - 1) * 2;
     }
@@ -323,42 +375,54 @@
     return currentValue + 2 <= maxValue;
   }
 
-  function getStartForm(pet_name, selected) {
-    function isSelected(stat) {
-      if (selected && stat.toLowerCase() == selected.toLowerCase())
-        return "selected";
-      else return "";
-    }
-    return $(
-      /*jshint multistr: true*/
-      '<form action="process_' +
-        scriptname +
-        '" method="post">\
-  <p>Start a new course: </p>\
-  <input type="hidden" name="type" value="start">\
-  <input type="hidden" name="pet_name" value="' +
-        pet_name +
-        '">\
-  <select name="course_type">\
-	<option value="Strength" ' +
-        isSelected("strength") +
-        '>Strength</option>\
-	<option value="Defence" ' +
-        isSelected("defence") +
-        '>Defence</option>\
-	<option value="Agility" ' +
-        isSelected("agility") +
-        '>Agility</option>\
-	<option value="Endurance" ' +
-        isSelected("endurance") +
-        '>Endurance</option>\
-	<option value="Level" ' +
-        isSelected("level") +
-        '>Level</option>\
-  </select>\
-  <p><input type="submit" value="Start Course"></p>\
-</form>'
-    );
+  function createForm({ action, method, children, onSubmit }) {
+    const form = document.createElement("form");
+    form.action = action;
+    form.method = method;
+    children.forEach((child) => form.append(child));
+    if (onSubmit) form.addEventListener("submit", onSubmit);
+    return form;
+  }
+
+  function createInput({ name, value, type }) {
+    const input = document.createElement("input");
+    input.name = name;
+    input.value = value;
+    input.type = type;
+    return input;
+  }
+
+  function createSelect({ name, value, options }) {
+    const select = document.createElement("select");
+    select.name = name;
+
+    options.forEach((option) => {
+      const optionElement = document.createElement("option");
+      optionElement.value = option;
+      optionElement.textContent = option;
+      optionElement.selected = option.toLowerCase() === value?.toLowerCase();
+      select.append(optionElement);
+    });
+
+    return select;
+  }
+
+  function getStartForm(petName, selected) {
+    return createForm({
+      action: "process_" + getScriptName(),
+      method: "post",
+      children: [
+        createInput({ name: "type", value: "start", type: "hidden" }),
+        createInput({ name: "pet_name", value: petName, type: "hidden" }),
+        createSelect({
+          name: "course_type",
+          value: selected,
+          options: ["Strength", "Defence", "Agility", "Endurance", "Level"],
+        }),
+        " ",
+        createInput({ type: "submit", value: "Start Course" }),
+      ],
+    });
   }
 
   function searchShopWiz(searchTerm) {
@@ -405,43 +469,40 @@
     return buttonContainer;
   }
 
-  function getCompleteForm(pet_name) {
-    var form = $(
-      /*jshint multistr: true*/
-      '<b>Course Finished!</b>\
-<form action="process_' +
-        scriptname +
-        '" method="post">\
-  <input type="hidden" name="type" value="complete">\
-  <input type="hidden" name="pet_name" value="' +
-        pet_name +
-        '">\
-  <p><input type="submit" value="Complete Course"></p>\
-</form>'
-    );
-    form.submit(submitComplete);
-    return form;
+  function getCompleteForm(petName) {
+    return createForm({
+      action: "process_" + getScriptName(),
+      method: "post",
+      children: [
+        createInput({ name: "type", value: "complete", type: "hidden" }),
+        createInput({ name: "pet_name", value: petName, type: "hidden" }),
+        createInput({ type: "submit", value: "Complete Course" }),
+      ],
+      onSubmit: submitComplete,
+    });
   }
 
   function submitComplete(e) {
     e.preventDefault();
-    var url = $(this).attr("action");
-    var method = $(this).attr("method") || "GET";
+    const jQuery = unsafeWindow.jQuery;
+    var url = jQuery(this).attr("action");
+    var method = jQuery(this).attr("method") || "GET";
     var postData = getFormObject(this);
-    var form = $(this);
-    $.ajax(url, {
-      method: method,
-      data: postData,
-    })
+    var form = jQuery(this);
+    jQuery
+      .ajax(url, {
+        method: method,
+        data: postData,
+      })
       .done(function (html) {
-        var p = $(html).find("p");
+        var p = jQuery(html).find("p");
         form.parent().append(p);
         form
           .parent()
           .append(
             getStartForm(
               postData.pet_name,
-              getNextStat(form.closest("td").prev("td"), p.text())
+              getNextStat(form.closest("td").prev("td").get(0), p.text())
             )
           );
         form.remove();
@@ -451,52 +512,94 @@
       });
   }
 
-  function getStudyingRows() {
+  function getPetNotTrainingInfo() {
+    return [...document.querySelectorAll("td.content tr")]
+      .filter((tr) => tr.textContent.includes("is not on a course"))
+      .map((headerRow) => {
+        const bodyRow = headerRow.nextElementSibling;
+        const matches = headerRow.textContent.match(
+          /^(?<petName>\w+).*is not on a course/i
+        );
+
+        return {
+          petName: matches.groups.petName,
+          trainingCell: bodyRow.lastChild,
+          nextStat: getNextStat(bodyRow.firstChild),
+        };
+      });
+  }
+
+  function getCountdowns(trainingCell) {
+    return [...trainingCell.querySelectorAll("b")].flatMap((element) => {
+      const match = element.textContent.match(
+        /(?<hours>\d+) ?hrs, ?(?<minutes>\d+) ?minutes, ?(?<seconds>\d+) ?seconds/
+      );
+      if (!match) return [];
+
+      // Training fortune cookie original time before it's reduced
+      const isActualTime =
+        !element.parentElement.classList.contains("strikethrough");
+      const timeLeft = {
+        hours: parseInt(match.groups.hours),
+        minutes: parseInt(match.groups.minutes),
+        seconds: parseInt(match.groups.seconds),
+      };
+      const endTime = new Date();
+      endTime.setSeconds(endTime.getSeconds() + timeLeft.seconds);
+      endTime.setMinutes(endTime.getMinutes() + timeLeft.minutes);
+      endTime.setHours(endTime.getHours() + timeLeft.hours);
+      return [
+        {
+          element,
+          isActualTime,
+          timeLeft,
+          endTime,
+        },
+      ];
+    });
+  }
+
+  function getTrainingInfo(headerRow) {
+    const matches = headerRow.textContent.match(
+      /^(?<petName>\w+).*currently studying (?<stat>\w+)/
+    );
+
+    return {
+      petName: matches.groups.petName,
+      stat: matches.groups.stat,
+    };
+  }
+
+  function getTrainingCost(trainingCell) {
+    const itemElements = [...trainingCell.querySelectorAll("b")].filter((b) => {
+      return (
+        b.textContent.includes("Codestone") || b.textContent.includes("Dubloon")
+      );
+    });
+
+    return itemElements.map((element) => ({
+      itemName: element.textContent,
+      element,
+    }));
+  }
+
+  function getPetTrainingInfo() {
     return [...document.querySelectorAll("td.content tr")]
       .filter((tr) => tr.textContent.includes("is currently studying"))
       .map((headerRow) => {
         const bodyRow = headerRow.nextElementSibling;
+        const trainingCell = bodyRow.lastChild;
         const isCourseActive = bodyRow.textContent.includes(
           "Time till course finishes"
         );
-        const matches = headerRow.textContent.match(
-          /^(?<petName>\w+).*currently studying (?<stat>\w+)/
-        );
-        const countdowns = [...bodyRow.querySelectorAll("b")].flatMap(
-          (element) => {
-            const match = element.textContent.match(
-              /(?<hours>\d+) ?hrs, ?(?<minutes>\d+) ?minutes, ?(?<seconds>\d+) ?seconds/
-            );
-            if (!match) return [];
+        const countdowns = getCountdowns(trainingCell);
 
-            // Training fortune cookie original time before it's reduced
-            const isActualTime =
-              !element.parentElement.classList.contains("strikethrough");
-            const timeLeft = {
-              hours: parseInt(match.groups.hours),
-              minutes: parseInt(match.groups.minutes),
-              seconds: parseInt(match.groups.seconds),
-            };
-            const endTime = new Date();
-            endTime.setSeconds(endTime.getSeconds() + timeLeft.seconds);
-            endTime.setMinutes(endTime.getMinutes() + timeLeft.minutes);
-            endTime.setHours(endTime.getHours() + timeLeft.hours);
-            return [
-              {
-                element,
-                isActualTime,
-                timeLeft,
-                endTime,
-              },
-            ];
-          }
-        );
         return {
           countdowns,
-          trainingCell: bodyRow.lastChild,
+          trainingCell,
           isCourseActive,
-          petName: matches.groups.petName,
-          stat: matches.groups.stat,
+          trainingCost: getTrainingCost(trainingCell),
+          ...getTrainingInfo(headerRow),
           endTime: countdowns.find(({ isActualTime }) => isActualTime)?.endTime,
         };
       });
@@ -530,11 +633,10 @@
         timeoutId = setTimeout(tick, 1000);
         return;
       }
-      sendNotification(
-        "Course Finished!",
-        petName + " has finished studying " + stat + ".",
-        petName
-      );
+      sendNotification("Course Finished!", {
+        body: petName + " has finished studying " + stat + ".",
+        petName,
+      });
 
       trainingCell.innerHtml = getCompleteForm(petName);
       return;
@@ -551,7 +653,7 @@
         element.textContent = "Course Finished!";
         return;
       }
-      var timeLeft = getTimeUntil(endTime);
+      const timeLeft = getTimeUntil(endTime);
       element.textContent = `${timeLeft.hours} hrs, ${timeLeft.minutes} minutes, ${timeLeft.seconds} seconds`;
       timeoutId = setTimeout(tick, remainingMs % 1000);
     }
@@ -559,18 +661,18 @@
   }
 
   function addRequestNotificationButton() {
-    if (Notification.permission === "granted") {
-      return
+    if (Notification.permission === "granted" && !DEBUG) {
+      return;
     }
 
-    var button = document.createElement("button");
+    const button = document.createElement("button");
     button.textContent = "Enable Notifications for Training Helper";
     button.style.fontSize = "1.5em";
     button.style.margin = "16px auto";
     button.onclick = function () {
       Notification.requestPermission().then((result) => {
         if (result === "granted") {
-          new Notification("Notifications enabled!", {
+          sendNotification("Notifications enabled!", {
             body: "You will now receive notifications from the Training Helper.",
           });
           button.remove();
