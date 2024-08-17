@@ -37,10 +37,12 @@
     }
 
     getStudyingRows().forEach((row) => {
-      addNotificationListener(row);
-      row.countdowns.forEach(startCountdown);
+      if (row.isCourseActive) {
+        addNotificationListener(row);
+        row.countdowns.forEach(startCountdown);
+      }
     });
-    
+
     $('form[action="process_' + scriptname + '"]').submit(submitComplete);
 
     $('b:contains("is not on a course")').each(function () {
@@ -49,7 +51,6 @@
       container.append(getStartForm(pet, getNextStat(container.prev("td"))));
     });
 
-    
     $('p b:contains("Codestone")').each(function () {
       var codestone = $(this).text();
       $(this).next("img").css("margin-bottom", "10px");
@@ -60,8 +61,8 @@
   }
 
   function isStatusPage() {
-    const query = new URLSearchParams(window.location.search)
-    return query.get("type") === "status"
+    const query = new URLSearchParams(window.location.search);
+    return query.get("type") === "status";
   }
 
   function trainingCost(level) {
@@ -451,48 +452,59 @@
   }
 
   function getStudyingRows() {
-    return [...document.querySelectorAll("td.content tr")].filter((tr) => 
-      tr.textContent.includes("is currently studying")
-    ).map((headerRow) => {
-      const bodyRow = headerRow.nextElementSibling;
-      const isCourseActive = bodyRow.textContent.includes("Time till course finishes");
-      const matches = headerRow.textContent.match(/^(?<petName>\w+).*currently studying (?<stat>\w+)/);
-      const countdowns = [...bodyRow.querySelectorAll("b")].flatMap((element) => {
-        const match = element.textContent.match(/(?<hours>\d+) ?hrs, ?(?<minutes>\d+) ?minutes, ?(?<seconds>\d+) ?seconds/);
-        if (!match) return [];
-        
-        // Training fortune cookie original time before it's reduced
-        const isActualTime = !element.parentElement.classList.contains("strikethrough");
-        const timeLeft = {
-          hours: parseInt(match.groups.hours),
-          minutes: parseInt(match.groups.minutes),
-          seconds: parseInt(match.groups.seconds),
+    return [...document.querySelectorAll("td.content tr")]
+      .filter((tr) => tr.textContent.includes("is currently studying"))
+      .map((headerRow) => {
+        const bodyRow = headerRow.nextElementSibling;
+        const isCourseActive = bodyRow.textContent.includes(
+          "Time till course finishes"
+        );
+        const matches = headerRow.textContent.match(
+          /^(?<petName>\w+).*currently studying (?<stat>\w+)/
+        );
+        const countdowns = [...bodyRow.querySelectorAll("b")].flatMap(
+          (element) => {
+            const match = element.textContent.match(
+              /(?<hours>\d+) ?hrs, ?(?<minutes>\d+) ?minutes, ?(?<seconds>\d+) ?seconds/
+            );
+            if (!match) return [];
+
+            // Training fortune cookie original time before it's reduced
+            const isActualTime =
+              !element.parentElement.classList.contains("strikethrough");
+            const timeLeft = {
+              hours: parseInt(match.groups.hours),
+              minutes: parseInt(match.groups.minutes),
+              seconds: parseInt(match.groups.seconds),
+            };
+            const endTime = new Date();
+            endTime.setSeconds(endTime.getSeconds() + timeLeft.seconds);
+            endTime.setMinutes(endTime.getMinutes() + timeLeft.minutes);
+            endTime.setHours(endTime.getHours() + timeLeft.hours);
+            return [
+              {
+                element,
+                isActualTime,
+                timeLeft,
+                endTime,
+              },
+            ];
+          }
+        );
+        return {
+          countdowns,
+          trainingCell: bodyRow.lastChild,
+          isCourseActive,
+          petName: matches.groups.petName,
+          stat: matches.groups.stat,
+          endTime: countdowns.find(({ isActualTime }) => isActualTime)?.endTime,
         };
-        const endDate = new Date();
-        endDate.setSeconds(endDate.getSeconds() + timeLeft.seconds);
-        endDate.setMinutes(endDate.getMinutes() + timeLeft.minutes);
-        endDate.setHours(endDate.getHours() + timeLeft.hours);
-        return [{ 
-          element,
-          isActualTime,
-          timeLeft,
-          endDate,
-        }]
       });
-      return ({
-        countdowns,
-        trainingCell: bodyRow.lastChild,
-        isCourseActive,
-        petName: matches.groups.petName,
-        stat: matches.groups.stat,
-        endTime: countdowns.find(({ isActualTime }) => isActualTime)?.endTime,
-      })
-    });
   }
 
   /**
-   * @param {DateTime} date 
-   * @returns 
+   * @param {DateTime} date
+   * @returns
    */
   function getTimeUntil(date) {
     var remainingMs = date.getTime() - new Date().getTime();
@@ -505,15 +517,15 @@
     return {
       hours,
       minutes,
-      seconds
-    }
+      seconds,
+    };
   }
 
   function addNotificationListener({ petName, stat, endTime, trainingCell }) {
     let timeoutId;
     function tick() {
       if (timeoutId) clearTimeout(timeoutId);
-      const remainingMs = endDate.getTime() - new Date().getTime();
+      const remainingMs = endTime.getTime() - new Date().getTime();
       if (remainingMs > 1000) {
         timeoutId = setTimeout(tick, 1000);
         return;
@@ -526,23 +538,23 @@
 
       trainingCell.innerHtml = getCompleteForm(petName);
       return;
-    };
+    }
     tick();
   }
 
-  function startCountdown({ element, endDate }) {
+  function startCountdown({ element, endTime }) {
     let timeoutId;
     function tick() {
       if (timeoutId) clearTimeout(timeoutId);
-      const remainingMs = endDate.getTime() - new Date().getTime();
+      const remainingMs = endTime.getTime() - new Date().getTime();
       if (remainingMs <= 0) {
         element.textContent = "Course Finished!";
         return;
       }
-      var timeLeft = getTimeUntil(endDate);
+      var timeLeft = getTimeUntil(endTime);
       element.textContent = `${timeLeft.hours} hrs, ${timeLeft.minutes} minutes, ${timeLeft.seconds} seconds`;
       timeoutId = setTimeout(tick, remainingMs % 1000);
-    };
+    }
     tick();
   }
 
