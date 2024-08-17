@@ -2,10 +2,10 @@
 // @name         Neopets Training Helper
 // @author       Hiddenist
 // @namespace    https://hiddenist.com
-// @version      2024-07-28
+// @version      2024-08-16
 // @description  Makes codestone training your pet require fewer clicks and less math.
-// @match        http*://www.neopets.com/island/fight_training.phtml?type=status
-// @match        http*://www.neopets.com/island/training.phtml?type=status
+// @match        http*://www.neopets.com/island/fight_training.phtml*
+// @match        http*://www.neopets.com/island/training.phtml*
 // @grant        unsafeWindow
 // @updateURL    https://github.com/Meerca/Neopets-Userscripts/raw/main/training-helper.user.js
 // @downloadURL  https://github.com/Meerca/Neopets-Userscripts/raw/main/training-helper.user.js
@@ -23,11 +23,46 @@
   };
 
   var $ = unsafeWindow.jQuery;
+  var scriptname = window.location.pathname.split("/").pop();
+  var notification = null;
 
   // These are the levels at which more codestones need to be used.
   // Note: I skip the level 250 switch to the secret school, because it's better
   // to jump directly into that instead of training up HP at 8 codestones a point for HP.
   var courseLevels = [21, 41, 81, 101, 121, 151, 201, 300, 400, 500, 600, 750];
+
+  function main() {
+    if (!isStatusPage()) {
+      return;
+    }
+
+    getStudyingRows().forEach((row) => {
+      addNotificationListener(row);
+      row.countdowns.forEach(startCountdown);
+    });
+    
+    $('form[action="process_' + scriptname + '"]').submit(submitComplete);
+
+    $('b:contains("is not on a course")').each(function () {
+      var pet = $(this).text().split(" ")[0];
+      var container = $(this).closest("tr").next("tr").children("td").last();
+      container.append(getStartForm(pet, getNextStat(container.prev("td"))));
+    });
+
+    
+    $('p b:contains("Codestone")').each(function () {
+      var codestone = $(this).text();
+      $(this).next("img").css("margin-bottom", "10px");
+      $(this).after(getItemSearchForm(codestone));
+    });
+
+    addRequestNotificationButton();
+  }
+
+  function isStatusPage() {
+    const query = new URLSearchParams(window.location.search)
+    return query.get("type") === "status"
+  }
 
   function trainingCost(level) {
     /*
@@ -102,9 +137,7 @@
 
     console.log("Raised " + runs + " stats.  Cost:", totalCost);
   }
-  var scriptname = window.location.pathname.split("/").pop();
 
-  var notification = null;
   function sendNotification(title, body, petName) {
     $("title").html(title);
 
@@ -417,71 +450,107 @@
       });
   }
 
-  $('form[action="process_' + scriptname + '"]').submit(submitComplete);
+  function getStudyingRows() {
+    return [...document.querySelectorAll("td.content tr")].filter((tr) => 
+      tr.textContent.includes("is currently studying")
+    ).map((headerRow) => {
+      const bodyRow = headerRow.nextElementSibling;
+      const isCourseActive = bodyRow.textContent.includes("Time till course finishes");
+      const matches = headerRow.textContent.match(/^(?<petName>\w+).*currently studying (?<stat>\w+)/);
+      const countdowns = [...bodyRow.querySelectorAll("b")].flatMap((element) => {
+        const match = element.textContent.match(/(?<hours>\d+) ?hrs, ?(?<minutes>\d+) ?minutes, ?(?<seconds>\d+) ?seconds/);
+        if (!match) return [];
+        
+        // Training fortune cookie original time before it's reduced
+        const isActualTime = !element.parentElement.classList.contains("strikethrough");
+        const timeLeft = {
+          hours: parseInt(match.groups.hours),
+          minutes: parseInt(match.groups.minutes),
+          seconds: parseInt(match.groups.seconds),
+        };
+        const endDate = new Date();
+        endDate.setSeconds(endDate.getSeconds() + timeLeft.seconds);
+        endDate.setMinutes(endDate.getMinutes() + timeLeft.minutes);
+        endDate.setHours(endDate.getHours() + timeLeft.hours);
+        return [{ 
+          element,
+          isActualTime,
+          timeLeft,
+          endDate,
+        }]
+      });
+      return ({
+        countdowns,
+        trainingCell: bodyRow.lastChild,
+        isCourseActive,
+        petName: matches.groups.petName,
+        stat: matches.groups.stat,
+        endTime: countdowns.find(({ isActualTime }) => isActualTime)?.endTime,
+      })
+    });
+  }
 
-  $('b:contains("is not on a course")').each(function () {
-    var pet = $(this).text().split(" ")[0];
-    var container = $(this).closest("tr").next("tr").children("td").last();
-    container.append(getStartForm(pet, getNextStat(container.prev("td"))));
-  });
+  /**
+   * @param {DateTime} date 
+   * @returns 
+   */
+  function getTimeUntil(date) {
+    var remainingMs = date.getTime() - new Date().getTime();
+    var remainingSeconds = parseInt(remainingMs / 1000);
 
-  $(
-    'tr:contains("is currently studying") + tr > td:contains("Time till course finishes")'
-  ).each(function () {
-    var displayTime = $(this).find("b");
-    var m = displayTime.text().match(/(\d+) hrs, (\d+) minutes, (\d+) seconds/);
-    if (!m) return;
+    var seconds = remainingSeconds % 60;
+    var minutes = parseInt(remainingSeconds / 60) % 60;
+    var hours = parseInt(remainingSeconds / (60 * 60));
 
-    var time = {
-      hours: parseInt(m[1]),
-      minutes: parseInt(m[2]),
-      seconds: parseInt(m[3]),
-    };
-    var t = new Date();
+    return {
+      hours,
+      minutes,
+      seconds
+    }
+  }
 
-    t.setSeconds(t.getSeconds() + time.seconds);
-    t.setMinutes(t.getMinutes() + time.minutes);
-    t.setHours(t.getHours() + time.hours);
-
-    var studying = $(this).closest("tr").prev("tr").text();
-    m = studying.match(/^(\w+).*currently studying (\w+)/);
-    var petName = m[1];
-    var stat = m[2];
-
-    var tick = function () {
-      var ms = t.getTime() - new Date().getTime();
-
-      if (ms > 0) {
-        setTimeout(tick, ms % 1000);
-      } else {
-        sendNotification(
-          "Course Finished!",
-          petName + " has finished studying " + stat + ".",
-          petName
-        );
-
-        displayTime.closest("td").html(getCompleteForm(petName));
+  function addNotificationListener({ petName, stat, endTime, trainingCell }) {
+    let timeoutId;
+    function tick() {
+      if (timeoutId) clearTimeout(timeoutId);
+      const remainingMs = endDate.getTime() - new Date().getTime();
+      if (remainingMs > 1000) {
+        timeoutId = setTimeout(tick, 1000);
+        return;
       }
-
-      var remaining = parseInt(ms / 1000);
-      var seconds = remaining % 60;
-      var minutes = parseInt(remaining / 60) % 60;
-      var hours = parseInt(remaining / (60 * 60));
-
-      displayTime.html(
-        hours + " hrs, " + minutes + " minutes, " + seconds + " seconds"
+      sendNotification(
+        "Course Finished!",
+        petName + " has finished studying " + stat + ".",
+        petName
       );
+
+      trainingCell.innerHtml = getCompleteForm(petName);
+      return;
     };
     tick();
-  });
+  }
 
-  $('p b:contains("Codestone")').each(function () {
-    var codestone = $(this).text();
-    $(this).next("img").css("margin-bottom", "10px");
-    $(this).after(getItemSearchForm(codestone));
-  });
+  function startCountdown({ element, endDate }) {
+    let timeoutId;
+    function tick() {
+      if (timeoutId) clearTimeout(timeoutId);
+      const remainingMs = endDate.getTime() - new Date().getTime();
+      if (remainingMs <= 0) {
+        element.textContent = "Course Finished!";
+        return;
+      }
+      var timeLeft = getTimeUntil(endDate);
+      element.textContent = `${timeLeft.hours} hrs, ${timeLeft.minutes} minutes, ${timeLeft.seconds} seconds`;
+      timeoutId = setTimeout(tick, remainingMs % 1000);
+    };
+    tick();
+  }
 
-  if (Notification.permission !== "granted") {
+  function addRequestNotificationButton() {
+    if (Notification.permission === "granted") {
+      return
+    }
+
     var button = document.createElement("button");
     button.textContent = "Enable Notifications for Training Helper";
     button.style.fontSize = "1.5em";
@@ -499,4 +568,6 @@
 
     document.querySelector("td.content p").prepend(button);
   }
+
+  main();
 })();
