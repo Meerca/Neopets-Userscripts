@@ -54,34 +54,19 @@
       return;
     }
 
-    /**
-     * @type {Record<TrainingStatus, (trainingInfo: PetTrainingInfo) => void>}
-     */
-    const trainingStatusHandlers = {
-      [TrainingStatus.noCourseStarted](trainingInfo) {
-        addStartCourseForm(trainingInfo);
-      },
-      [TrainingStatus.active](trainingInfo) {
-        startCountdownTracker(trainingInfo);
-      },
-      [TrainingStatus.finished](trainingInfo) {
-        addListenerToCompleteCourseButton(trainingInfo);
-      },
-      [TrainingStatus.needsPayment](trainingInfo) {
-        handleTrainingItems(trainingInfo);
-      },
-    };
-
     getAllPetsTrainingInfo().forEach((trainingInfo) => {
       if (DEBUG) console.debug("Training info:", trainingInfo);
-      const currentStatusHandler = trainingStatusHandlers[trainingInfo.status];
 
-      if (!currentStatusHandler) {
-        console.warn("No handler for state:", trainingInfo.status);
-        return;
+      switch (trainingInfo.status) {
+        case TrainingStatus.noCourseStarted:
+          return addStartCourseForm(trainingInfo);
+        case TrainingStatus.active:
+          return startCountdownTracker(trainingInfo);
+        case TrainingStatus.finished:
+          return addListenerToCompleteCourseButton(trainingInfo);
+        case TrainingStatus.needsPayment:
+          return handleTrainingItems(trainingInfo);
       }
-
-      currentStatusHandler(trainingInfo);
     });
 
     addRequestNotificationButton();
