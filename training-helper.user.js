@@ -287,7 +287,9 @@
       (lowestStat === "endurance" && stats.endurance >= stats.level * 3) ||
       stats[highestStat] >= stats.level * 2;
 
-      const recommendation = mustTrainLevel ? "level" : lowestStat ?? fallbackValue;
+    const recommendation = mustTrainLevel
+      ? "level"
+      : lowestStat ?? fallbackValue;
 
     if (DEBUG) {
       console.debug("Training Recommendation:", {
