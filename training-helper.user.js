@@ -2,7 +2,7 @@
 // @name         Neopets Training Helper
 // @author       Hiddenist
 // @namespace    https://hiddenist.com
-// @version      2024-08-17-alpha2
+// @version      2024-08-17-alpha3
 // @description  Makes codestone training your pet require fewer clicks and less math.
 // @match        http*://www.neopets.com/island/fight_training.phtml*
 // @match        http*://www.neopets.com/island/training.phtml*
