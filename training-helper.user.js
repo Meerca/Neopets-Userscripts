@@ -289,7 +289,7 @@
     return select;
   }
 
-  function getStartForm(petName, selected) {
+  function createStartCourseForm(petName, selected) {
     return createForm({
       action: "process_" + getScriptName(),
       method: "post",
@@ -331,7 +331,7 @@
     );
   }
 
-  function getItemSearchForm(itemName) {
+  function createItemSearchForm(itemName) {
     const buttonContainer = document.createElement("div");
     buttonContainer.style.display = "grid";
     buttonContainer.style.gap = "16px";
@@ -351,16 +351,23 @@
     return buttonContainer;
   }
 
-  function getCompleteForm(petName) {
+  /**
+   * Creates a form to complete a course.
+   * @param {PetTrainingInfo} trainingInfo
+   */
+  function createCompleteCourseForm(trainingInfo) {
     return createForm({
       action: "process_" + getScriptName(),
       method: "post",
       children: [
         createInput({ name: "type", value: "complete", type: "hidden" }),
-        createInput({ name: "pet_name", value: petName, type: "hidden" }),
+        createInput({
+          name: "pet_name",
+          value: trainingInfo.petName,
+          type: "hidden",
+        }),
         createInput({ type: "submit", value: "Complete Course" }),
       ],
-      onSubmit: submitCourseCompletedForm,
     });
   }
 
@@ -369,7 +376,7 @@
    */
   function addStartCourseForm(trainingInfo) {
     trainingInfo.trainingCell.append(
-      getStartForm(
+      createStartCourseForm(
         trainingInfo.petName,
         recommendNextStatToTrain(trainingInfo.currentStats)
       )
@@ -433,7 +440,7 @@
     );
 
     trainingInfo.trainingCell.append(
-      getStartForm(trainingInfo.petName, nextStat)
+      createStartCourseForm(trainingInfo.petName, nextStat)
     );
   }
 
@@ -596,12 +603,15 @@
       .map(getTrainingInfo);
   }
 
-  function handleTrainingItems(row) {
-    row.trainingCost.forEach(({ element }) => {
+  /**
+   * @param {PetTrainingInfo} trainingInfo
+   */
+  function handleTrainingItems(trainingInfo) {
+    trainingInfo.trainingCost.forEach(({ element }) => {
       if (element.nextSibling && element.nextSibling.tagName === "IMG") {
         element.nextSibling.style = { marginBottom: "10px" };
       }
-      element.append(getItemSearchForm(element.textContent));
+      element.append(createItemSearchForm(element.textContent));
     });
   }
 
@@ -644,9 +654,10 @@
       element.textContent = "Course Finished!";
     });
 
-    // todo: this doesn't seem to be working right now.
-    // Let's use one tick for all of the countdowns for the pet instead of having the nofitication listener separate
-    trainingCell.innerHtml = getCompleteForm(petName);
+    trainingCell.innerHtml = "";
+    trainingCell.append(createCompleteCourseForm(trainingInfo));
+
+    addListenerToCompleteCourseButton(trainingInfo);
   }
 
   /**
