@@ -2,7 +2,7 @@
 // @name         Neopets Training Helper
 // @author       Hiddenist
 // @namespace    https://hiddenist.com
-// @version      2024-08-17-alpha3
+// @version      2024-08-17-alpha4
 // @description  Makes codestone training your pet require fewer clicks and less math.
 // @match        http*://www.neopets.com/island/fight_training.phtml*
 // @match        http*://www.neopets.com/island/training.phtml*
@@ -261,12 +261,44 @@
   }
 
   /**
-   * @param {Record<StatName, number>} stats
+   * @param {StatsWithElements | Omit<StatsWithElements, "elements">} stats
    * @returns {StatName}
    */
-  function recommendNextStatToTrain(stats, fallbackValue = "level") {
-    // todo: For now, just recommend the last trained stat. I need to rebuild and test the stat simulator.
-    return fallbackValue;
+  function recommendNextStatToTrain({ elements: _, ...stats }, fallbackValue = "level") {
+    let lowestStat = null;
+    let highestStat = null;
+
+    // Current logic just trains the lowest stat that isn't maxed out yet, but there's some stuff we should add for recommending training endurance up to 3x instead of when it's lowest.
+    for (const stat in stats) {
+      if (stat === "level" || stats[stat] > configuration.maxStats[stat]) continue;
+      if (!lowestStat || stats[stat] < stats[lowestStat]) {
+        lowestStat = stat;
+      }
+    }
+
+    for (const stat in stats) {
+      if (stat === "level") continue;
+      if (!highestStat || stats[stat] > stats[highestStat]) {
+        highestStat = stat;
+      }
+    }
+
+    const mustTrainLevel =
+      (lowestStat === "endurance" && stats.endurance >= stats.level * 3) ||
+      stats[highestStat] >= stats.level * 2;
+
+      const recommendation = mustTrainLevel ? "level" : lowestStat ?? fallbackValue;
+
+    if (DEBUG) {
+      console.debug("Training Recommendation:", {
+        lowestStat,
+        highestStat,
+        mustTrainLevel,
+        recommendation,
+      });
+    }
+
+    return recommendation;
   }
 
   /**
