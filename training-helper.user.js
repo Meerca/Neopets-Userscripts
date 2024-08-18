@@ -173,9 +173,9 @@
    * @param {HTMLTableCellElement} td
    * @param {StatsWithElements} stats
    * @param {string} increasedStatsMessage
-   * @returns {StatName | null} The name of the stat that was increased
+   * @returns {StatName | null} The name of the stat that was increased, or null if the message was not recognized.
    */
-  function increaseStat(stats, increasedStatsMessage) {
+  function updateDisplayedStatsAfterIncrease(stats, increasedStatsMessage) {
     /**
      * @type {StatName?}
      */
@@ -209,14 +209,17 @@
 
     stats[increasedStat] += pointsIncreased;
 
-    if (DEBUG) console.debug(stats);
+    if (increasedStat === "endurance") {
+      if (stats.currentHitpoints <= stats.endurance) {
+        stats.currentHitpoints += pointsIncreased;
+      }
 
-    // Minor thing to check: when training HP and the pet has reduced HP, does it increased the current HP or only the max?
+      stats.elements.endurance.textContent = `${stats.currentHitpoints} / ${stats.endurance}`;
+    } else {
+      stats.elements[increasedStat].textContent = stats[increasedStat];
+    }
 
-    stats.elements[increasedStat].textContent =
-      increasedStat === "endurance"
-        ? `${stats.currentHitpoints} / ${stats.endurance}`
-        : stats[increasedStat];
+    if (DEBUG) console.debug("Updated stats", stats);
 
     return increasedStat;
   }
@@ -269,6 +272,8 @@
     let highestStat = null;
 
     const statNames = ["strength", "defence", "agility", "endurance"];
+
+    // test cases: low current HP, negative stats, maxed out stats...
 
     // Current logic just trains the lowest stat that isn't maxed out yet, but there's some stuff we should add for recommending training endurance up to 3x instead of when it's lowest.
     for (const stat of statNames) {
@@ -540,7 +545,7 @@ A:hover{COLOR:#990000;}
 
     paragraphs.forEach((p) => trainingInfo.trainingCell.append(p));
 
-    const increasedStatName = increaseStat(
+    const increasedStatName = updateDisplayedStatsAfterIncrease(
       trainingInfo.currentStats,
       paragraphs.map((p) => p.textContent).join(" ")
     );
