@@ -770,7 +770,7 @@ A:hover{COLOR:#990000;}
       element.textContent = "Course Finished!";
     });
 
-    trainingCell.innerHtml = "";
+    trainingCell.innerHTML = "";
     addCourseCompleteForm(trainingInfo);
   }
 
