@@ -2,12 +2,11 @@
 // @name         Neopets Training Helper
 // @author       Hiddenist
 // @namespace    https://hiddenist.com
-// @version      2024-08-16-alpha
+// @version      2024-08-17-alpha
 // @description  Makes codestone training your pet require fewer clicks and less math.
 // @match        http*://www.neopets.com/island/fight_training.phtml*
 // @match        http*://www.neopets.com/island/training.phtml*
 // @match        http*://www.neopets.com/pirates/academy.phtml*
-// @grant        unsafeWindow
 // @updateURL    https://github.com/Meerca/Neopets-Userscripts/raw/main/training-helper.user.js
 // @downloadURL  https://github.com/Meerca/Neopets-Userscripts/raw/main/training-helper.user.js
 // @supportURL   https://github.com/Meerca/Neopets-Userscripts/issues
@@ -15,24 +14,38 @@
 (function () {
   ("use strict");
 
-  // Maximum level for each stat.
-  // todo: Add configuration to allow specifying these values
+  /**
+   * @typedef {keyof typeof maxTraining} StatName
+   */
+
+  /**
+   * The maximum level to train each stat to.
+   */
   const maxTraining = {
     strength: 750, // Does nothing after 750
     defence: 750, // Does nothing after 750
     agility: 201, // Not useful after 201, only used for equipping certain items
     endurance: Infinity,
+    level: Infinity,
   };
 
   /**
-   * @typedef {"codestone" | "dubloon" | "unknown"} ItemType
-   *
-   * @type {Record<ItemType, ItemType>}
+   * @typedef {keyof typeof ItemType} ItemType
    */
   const ItemType = {
     codestone: "codestone",
     dubloon: "dubloon",
     unknown: "unknown",
+  };
+
+  /**
+   * @typedef {keyof typeof TrainingStatus} TrainingStatus
+   */
+  const TrainingStatus = {
+    noCourseStarted: "noCourseStarted",
+    active: "active",
+    finished: "finished",
+    needsPayment: "needsPayment",
   };
 
   const DEBUG = false;
@@ -51,22 +64,34 @@
       return;
     }
 
-    getAllPetsTrainingInfo().forEach((row) => {
-      if (row.isCourseActive) {
-        startCountdownTracker(row);
-      } else {
-        handleTrainingItems(row);
+    /**
+     * @type {Record<TrainingStatus, (trainingInfo: PetTrainingInfo) => void>}
+     */
+    const trainingStatusHandlers = {
+      [TrainingStatus.noCourseStarted](trainingInfo) {
+        addStartCourseForm(trainingInfo);
+      },
+      [TrainingStatus.active](trainingInfo) {
+        startCountdownTracker(trainingInfo);
+      },
+      [TrainingStatus.finished](trainingInfo) {
+        addListenerToCompleteCourseButton(trainingInfo);
+      },
+      [TrainingStatus.needsPayment](trainingInfo) {
+        handleTrainingItems(trainingInfo);
+      },
+    };
+
+    getAllPetsTrainingInfo().forEach((trainingInfo) => {
+      if (DEBUG) console.debug("Training info:", trainingInfo);
+      const currentStatusHandler = trainingStatusHandlers[trainingInfo.status];
+
+      if (!currentStatusHandler) {
+        console.warn("No handler for state:", trainingInfo.status);
+        return;
       }
-    });
 
-    if (isSecretSchool()) {
-      document
-        .querySelector(`form[action="process_${getScriptName()}"]`)
-        ?.addEventListener("submit", submitComplete);
-    }
-
-    getPetNotTrainingInfo().forEach(({ petName, trainingCell, nextStat }) => {
-      trainingCell.append(getStartForm(petName, nextStat));
+      currentStatusHandler(trainingInfo);
     });
 
     addRequestNotificationButton();
@@ -75,10 +100,6 @@
   function isStatusPage() {
     const query = new URLSearchParams(window.location.search);
     return query.get("type") === "status";
-  }
-
-  function isSecretSchool() {
-    return window.location.pathname === "/island/fight_training.phtml";
   }
 
   function getScriptName() {
@@ -141,7 +162,7 @@
     const totalCost = { time: 0, redStones: 0, tanStones: 0 };
 
     for (let i = 0; i < runs; ++i) {
-      const next = calculateNextStat(stats);
+      const next = recommendNextStatToTrain(stats);
 
       const cost = trainingCost(stats.level);
       totalCost.time += cost.hours;
@@ -232,50 +253,55 @@
     }, intervalInMs);
   }
 
-  function getFormObject(form) {
-    var data = unsafeWindow.jQuery(form).find(":input").serializeArray();
-    var postData = {};
-    for (var i in data) {
-      postData[data[i].name] = data[i].value;
-    }
-    return postData;
-  }
+  /**
+   * Updates the stats based on the message received from the server.
+   *
+   * This updates both the stats object and the DOM elements.
+   *
+   * @param {HTMLTableCellElement} td
+   * @param {StatsWithElements} stats
+   * @param {string} increasedStatsMessage
+   * @returns {StatsWithElements} The updated stats
+   */
+  function increaseStat(stats, increasedStatsMessage) {
+    var increasedStat = increasedStatsMessage
+      .match(
+        /now has increased (?<statName>strength|defence|endurance|agility|level)/i
+      )
+      ?.groups.statName?.toLowerCase();
 
-  function increaseStat(td, stats, increased) {
-    if (increased) {
-      var matchStat = increased.match(
-        /now has increased (strength|defence|endurance|agility|level)/i
+    if (increasedStat) {
+      return stats;
+    }
+
+    if (!(increasedStat in stats)) {
+      console.warn(
+        "Unknown stat increased:",
+        increasedStat,
+        increasedStatsMessage
       );
-      if (matchStat && matchStat[1]) {
-        var stat = matchStat[1].toLowerCase();
-        if (!stats[stat]) {
-          return stats;
-        }
-        var points = 1;
-        var matchBonus = increased.match(/You went up (\d+) points/i);
-        if (matchBonus && matchBonus[1]) {
-          points = parseInt(matchBonus[1]);
-        }
-        stats[stat] += points;
-
-        var b = unsafeWindow.jQuery(td).find("b");
-        var e = {
-          level: b.eq(0),
-          strength: b.eq(1),
-          defence: b.eq(2),
-          agility: b.eq(3),
-          endurance: b.eq(4),
-        };
-
-        if (stat == "endurance") {
-          e[stat].html(
-            e[stat].text().replace(/(\d+ \/ )\d+/, "$1" + stats[stat])
-          );
-        } else {
-          e[stat].html(stats[stat]);
-        }
-      }
+      return stats;
     }
+
+    let pointsIncreased = 1;
+    const bonusPoints = increasedStatsMessage.match(
+      /You went up (?<bonusPoints>\d+) points/i
+    )?.groups.bonusPoints;
+    if (bonusPoints) {
+      pointsIncreased = parseInt(bonusPoints);
+    }
+
+    stats[increasedStat] += pointsIncreased;
+
+    if (DEBUG) console.debug(stats);
+
+    // Minor thing to check: when training HP and the pet has reduced HP, does it increased the current HP or only the max?
+
+    stats.elements[increasedStat].textContent =
+      increasedStat === "endurance"
+        ? `${stats.currentHitpoints} / ${stats.endurance}`
+        : stats[increasedStat];
+
     return stats;
   }
 
@@ -287,35 +313,51 @@
     }
   }
 
-  function getNextStat(td, increased) {
-    var statText = td.textContent;
-    function getStat(abbr) {
-      // why did I do this what even is this
-      var regex = new RegExp(abbr + "\\s*:\\s*(?:\\d+\\s*\\/\\s*)?(\\d+)", "i");
-      var m = statText.match(regex);
-      if (m) {
-        return parseInt(m[1]);
-      }
-      return 0;
-    }
-
-    var stats = {
-      strength: getStat("Str"),
-      defence: getStat("Def"),
-      agility: getStat("Mov"),
-      endurance: getStat("Hp"),
-      level: getStat("Lvl"),
+  /**
+   * @typedef {Object} StatsWithElements
+   * @property {number} level
+   * @property {number} strength
+   * @property {number} defence
+   * @property {number} agility
+   * @property {number} endurance
+   * @property {number} currentHitpoints
+   * @property {Record<StatName, HTMLElement>} elements
+   *
+   * @param {HTMLElement} currentStatsCell
+   * @returns
+   */
+  function getCurrentStats(currentStatsCell) {
+    const boldTags = currentStatsCell.querySelectorAll("b");
+    var elements = {
+      level: boldTags[0],
+      strength: boldTags[1],
+      defence: boldTags[2],
+      agility: boldTags[3],
+      endurance: boldTags[4],
     };
 
-    if (increased) {
-      increaseStat(td, stats, increased);
-    }
+    const enduranceText = elements.endurance.textContent;
+    const enduranceMatch = enduranceText.match(
+      /(?<currentHp>\d+) ?\/ ?(?<maxHp>\d+)/
+    );
 
-    return calculateNextStat(stats);
+    return {
+      elements,
+      level: parseInt(elements.level.textContent),
+      strength: parseInt(elements.strength.textContent),
+      defence: parseInt(elements.defence.textContent),
+      agility: parseInt(elements.agility.textContent),
+      endurance: parseInt(enduranceMatch?.groups.maxHp),
+      currentHitpoints: parseInt(enduranceMatch?.groups.currentHp),
+    };
   }
 
   // todo: This is garbage that I need to rewrite, thanks past me
-  function calculateNextStat(stats) {
+  /**
+   * @param {Record<StatName, number>} stats
+   * @returns {StatName}
+   */
+  function recommendNextStatToTrain(stats) {
     var nextLevel = getNextCourseLevel(stats.level);
 
     // Find the maximum and minimum valued stats
@@ -481,55 +523,71 @@
         createInput({ name: "pet_name", value: petName, type: "hidden" }),
         createInput({ type: "submit", value: "Complete Course" }),
       ],
-      onSubmit: submitComplete,
+      onSubmit: submitCourseCompletedForm,
     });
   }
 
-  function submitComplete(e) {
-    e.preventDefault();
-    const jQuery = unsafeWindow.jQuery;
-    var url = jQuery(this).attr("action");
-    var method = jQuery(this).attr("method") || "GET";
-    var postData = getFormObject(this);
-    var form = jQuery(this);
-    jQuery
-      .ajax(url, {
-        method: method,
-        data: postData,
-      })
-      .done(function (html) {
-        var p = jQuery(html).find("p");
-        form.parent().append(p);
-        form
-          .parent()
-          .append(
-            getStartForm(
-              postData.pet_name,
-              getNextStat(form.closest("td").prev("td").get(0), p.text())
-            )
-          );
-        form.remove();
-      })
-      .fail(function () {
-        unsafeWindow.alert("Post failure :(");
-      });
+  /**
+   * @param {PetTrainingInfo} trainingInfo
+   */
+  function addStartCourseForm(trainingInfo) {
+    trainingInfo.trainingCell.append(
+      getStartForm(
+        trainingInfo.petName,
+        recommendNextStatToTrain(trainingInfo.currentStats)
+      )
+    );
   }
 
-  function getPetNotTrainingInfo() {
-    return [...document.querySelectorAll("td.content tr")]
-      .filter((tr) => tr.textContent.includes("is not on a course"))
-      .map((headerRow) => {
-        const bodyRow = headerRow.nextElementSibling;
-        const matches = headerRow.textContent.match(
-          /^(?<petName>\w+).*is not on a course/i
-        );
+  /**
+   * Attaches an event listener to a complete course submission form to handle the submission as an AJAX request.
+   * @param {PetTrainingInfo} trainingInfo
+   * @returns {function} A function to remove the event listener
+   */
+  function addListenerToCompleteCourseButton(trainingInfo) {
+    const form = trainingInfo.trainingCell.querySelector(
+      'form[action^="process_]'
+    );
+    if (!form?.type?.value !== "complete") return;
 
-        return {
-          petName: matches.groups.petName,
-          trainingCell: bodyRow.lastChild,
-          nextStat: getNextStat(bodyRow.firstChild),
-        };
-      });
+    const listener = async (e) => {
+      await submitCourseCompletedForm(form, trainingInfo);
+      e.preventDefault();
+    };
+
+    form.addEventListener("submit", submitCourseCompletedForm);
+
+    return () => form.removeEventListener("submit", listener);
+  }
+
+  /**
+   * @param {HTMLFormElement} form
+   * @param {PetTrainingInfo} trainingInfo
+   */
+  async function submitCourseCompletedForm(form, trainingInfo) {
+    const response = await fetch(form.action, {
+      method: form.method?.toUpperCase() || "GET",
+      body: new FormData(form),
+    });
+
+    const body = await response.text();
+
+    // process the response body as HTML, and get the paragraph out to display
+
+    const responseDom = new DOMParser().parseFromString(body, "text/html");
+    const p = responseDom.querySelector("p");
+
+    // remove children from the training cell
+    trainingInfo.trainingCell.innerHTML = "";
+    trainingInfo.trainingCell.append(p);
+
+    increaseStat(trainingInfo.currentStats, responseDom.textContent);
+
+    const nextStat = recommendNextStatToTrain(trainingInfo.currentStats);
+
+    trainingInfo.trainingCell.append(
+      getStartForm(trainingInfo.petName, nextStat)
+    );
   }
 
   /**
@@ -628,13 +686,14 @@
 
   /**
    * @typedef {Object} PetTrainingInfo
-   * @property {HTMLElement} trainingCell
-   * @property {boolean} isCourseActive
+   * @property {TrainingStatus} status
+   * @property {StatsWithElements} currentStats
    * @property {Date?} endTime
    * @property {Countdown[]} countdowns
    * @property {string} petName
    * @property {StatName} stat
    * @property {ItemInfo[]} trainingCost
+   * @property {HTMLElement} trainingCell
    *
    * @param {HTMLTableRowElement} headerRow
    * @returns {PetTrainingInfo}
@@ -643,19 +702,35 @@
     const titleRegexMatches = headerRow.textContent.match(
       /^(?<petName>\w+).*(?:currently studying (?<stat>\w+)|not on a course)/
     );
+
+    if (!titleRegexMatches) {
+      throw new Error(
+        "Unrecognized header row format for training info: " +
+          headerRow.textContent
+      );
+    }
     const bodyRow = headerRow.nextElementSibling;
     const trainingCell = bodyRow.lastChild;
-    const isCourseActive = bodyRow.textContent.includes(
-      "Time till course finishes"
-    );
     const countdowns = getCountdowns(trainingCell);
 
+    const status = headerRow.textContent.includes("is not on a course")
+      ? TrainingStatus.noCourseStarted
+      : bodyRow.textContent.includes("Time till course finishes")
+      ? TrainingStatus.active
+      : bodyRow.textContent.includes("Course Finished!")
+      ? TrainingStatus.finished
+      : TrainingStatus.needsPayment;
+
+    const currentStatsCell = bodyRow.firstChild;
+    const currentStats = getCurrentStats(currentStatsCell);
+
     return {
+      status,
       trainingCell,
+      currentStats,
       petName: titleRegexMatches.groups.petName,
-      stat: titleRegexMatches.groups.stat,
+      stat: titleRegexMatches.groups.stat?.toLowerCase(),
       countdowns,
-      isCourseActive,
       trainingCost: getTrainingCost(trainingCell),
       endTime: countdowns.find(({ isActualTime }) => isActualTime)?.endTime,
     };
