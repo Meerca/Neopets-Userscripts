@@ -741,7 +741,11 @@
    */
   function getAllPetsTrainingInfo() {
     return [...document.querySelectorAll("td.content tr")]
-      .filter((tr) => tr.textContent.includes("is currently studying"))
+      .filter(
+        (tr) =>
+          tr.textContent.includes("is currently studying") ||
+          tr.textContent.includes("is not on a course")
+      )
       .map(getTrainingInfo);
   }
 
