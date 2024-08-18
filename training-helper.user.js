@@ -13,6 +13,7 @@
 // ==/UserScript==
 (function () {
   ("use strict");
+  const DEBUG = false;
 
   /**
    * @typedef {keyof typeof maxTraining} StatName
@@ -47,17 +48,6 @@
     finished: "finished",
     needsPayment: "needsPayment",
   };
-
-  const DEBUG = false;
-
-  // These are the levels at which more codestones need to be used.
-  // Note: I skip the level 250 switch to the secret school, because it's better
-  // to jump directly into that instead of training up HP at 8 codestones a point for HP.
-
-  // todo: Update for dubloons
-  const courseLevels = [
-    21, 41, 81, 101, 121, 151, 201, 300, 400, 500, 600, 750,
-  ];
 
   function main() {
     if (!isStatusPage()) {
@@ -104,80 +94,6 @@
 
   function getScriptName() {
     return window.location.pathname.split("/").pop();
-  }
-
-  function trainingCost(level) {
-    /*
-	  Grasshopper   1-20     1 codestone     2 hours
-	  Basic         21-40    2 codestones    3 hours
-	  Intermediate  41-80    3 codestones    4 hours
-	  Adept         81-100   4 codestones    6 hours
-	  Advanced      101-120  5 codestones    8 hours
-	  Expert        121-150  6 codestones    12 hours
-	  Master        151-200  7 codestones    18 hours
-	  Grand Master  201-250  8 codestones    24 hours
-
-	  Intermediate  250      1 codestone     4 hours
-	  Adept	        300      2 codestones    6 hours
-	  Advanced      400      3 codestones    8 hours
-	  Expert        500      4 codestones    10 hours
-	  Master        600      5 codestones    12 hours
-	  Grand Master  750+     6 codestones    12 hours
-	*/
-
-    if (level < 21) {
-      return { codestones: 1, hours: 2, type: "basic" };
-    } else if (level < 41) {
-      return { codestones: 2, hours: 3, type: "basic" };
-    } else if (level < 81) {
-      return { codestones: 3, hours: 4, type: "basic" };
-    } else if (level < 101) {
-      return { codestones: 4, hours: 6, type: "basic" };
-    } else if (level < 121) {
-      return { codestones: 5, hours: 8, type: "basic" };
-    } else if (level < 151) {
-      return { codestones: 6, hours: 12, type: "basic" };
-    } else if (level < 201) {
-      return { codestones: 7, hours: 18, type: "basic" };
-    } else if (level < 250) {
-      return { codestones: 8, hours: 24, type: "basic" };
-    } else if (level < 300) {
-      return { codestones: 1, hours: 4, type: "advanced" };
-    } else if (level < 400) {
-      return { codestones: 2, hours: 6, type: "advanced" };
-    } else if (level < 500) {
-      return { codestones: 3, hours: 8, type: "advanced" };
-    } else if (level < 600) {
-      return { codestones: 4, hours: 10, type: "advanced" };
-    } else if (level < 750) {
-      return { codestones: 5, hours: 12, type: "advanced" };
-    } else {
-      return { codestones: 6, hours: 12, type: "advanced" };
-    }
-  }
-
-  function simulate(stats, runs) {
-    if (typeof runs == "undefined") runs = 100;
-
-    const totalCost = { time: 0, redStones: 0, tanStones: 0 };
-
-    for (let i = 0; i < runs; ++i) {
-      const next = recommendNextStatToTrain(stats);
-
-      const cost = trainingCost(stats.level);
-      totalCost.time += cost.hours;
-      if (cost.type == "advanced") {
-        totalCost.redStones += cost.codestones;
-      } else {
-        totalCost.tanStones += cost.codestones;
-      }
-
-      stats[next]++;
-
-      console.log("Trained " + next, stats, cost);
-    }
-
-    console.log("Raised " + runs + " stats.  Cost:", totalCost);
   }
 
   function sendNotification(
@@ -261,17 +177,20 @@
    * @param {HTMLTableCellElement} td
    * @param {StatsWithElements} stats
    * @param {string} increasedStatsMessage
-   * @returns {StatsWithElements} The updated stats
+   * @returns {StatName | null} The name of the stat that was increased
    */
   function increaseStat(stats, increasedStatsMessage) {
+    /**
+     * @type {StatName?}
+     */
     var increasedStat = increasedStatsMessage
       .match(
         /now has increased (?<statName>strength|defence|endurance|agility|level)/i
       )
       ?.groups.statName?.toLowerCase();
 
-    if (increasedStat) {
-      return stats;
+    if (!increasedStat) {
+      return null;
     }
 
     if (!(increasedStat in stats)) {
@@ -302,15 +221,7 @@
         ? `${stats.currentHitpoints} / ${stats.endurance}`
         : stats[increasedStat];
 
-    return stats;
-  }
-
-  function getNextCourseLevel(level) {
-    for (var i in courseLevels) {
-      if (courseLevels[i] > level) {
-        return courseLevels[i];
-      }
-    }
+    return increasedStat;
   }
 
   /**
@@ -352,72 +263,13 @@
     };
   }
 
-  // todo: This is garbage that I need to rewrite, thanks past me
   /**
    * @param {Record<StatName, number>} stats
    * @returns {StatName}
    */
-  function recommendNextStatToTrain(stats) {
-    var nextLevel = getNextCourseLevel(stats.level);
-
-    // Find the maximum and minimum valued stats
-    let minStat = null;
-    let maxStat = null;
-    for (let stat in stats) {
-      let currentStatValue = stats[stat];
-      if (!maxStat || currentStatValue > stats[maxStat]) {
-        maxStat = stat;
-      }
-
-      if (stat == "level" || maxTraining[stat] <= currentStatValue) {
-        continue;
-      }
-
-      if (!minStat || currentStatValue < stats[minStat]) {
-        minStat = stat;
-      }
-    }
-
-    //console.log(minStat, maxStat, stats.level*2, canTrain(minStat, stats), canTrain('endurance', stats));
-
-    const mustTrainLevel = stats[maxStat] > stats.level * 2;
-
-    if (canTrain(minStat, stats) && !mustTrainLevel) {
-      // train our minimum value stat if we can
-      return minStat;
-    }
-
-    // I feel like this is prioritizing endurance too much right now, I want to keep a safer margin
-    if (
-      canTrain("endurance", stats) &&
-      (maxStat == "endurance" || !mustTrainLevel)
-    ) {
-      return "endurance";
-    }
-
-    return "level";
-  }
-
-  // Check whether or not a stat is possible and safe to train
-  function canTrain(stat, stats) {
-    const currentValue = stats[stat];
-    const nextLevel = getNextCourseLevel(stats.level);
-
-    if (currentValue >= maxTraining[stat]) {
-      return false;
-    }
-
-    var nextHpLevel = Math.max(Math.ceil(stats.endurance / 2), nextLevel);
-    let maxValue = (nextLevel - 1) * 2;
-    const nextNextLevel = getNextCourseLevel(nextHpLevel);
-
-    if (stat == "endurance") {
-      maxValue = (nextNextLevel - 3) * 2; // Leave three levels in case of accidental level increases or bonus stats
-    }
-
-    // console.log(stat, maxValue, currentValue + 2);
-
-    return currentValue + 2 <= maxValue;
+  function recommendNextStatToTrain(stats, fallbackValue = "level") {
+    // todo: For now, just recommend the last trained stat. I need to rebuild and test the stat simulator.
+    return fallbackValue;
   }
 
   function createForm({ action, method, children, onSubmit }) {
@@ -551,8 +403,8 @@
     if (!form?.type?.value !== "complete") return;
 
     const listener = async (e) => {
-      await submitCourseCompletedForm(form, trainingInfo);
       e.preventDefault();
+      await submitCourseCompletedForm(form, trainingInfo);
     };
 
     form.addEventListener("submit", submitCourseCompletedForm);
@@ -574,6 +426,10 @@
 
     // process the response body as HTML, and get the paragraph out to display
 
+    // Possible response: <div class="errorMessage"><b>Error: </b>Sorry, this pet does not seem to be on a course!</div>
+
+    // <html><head></head><body><center><img src="//pets.neopets.com/cpn/Gelinah/1/2.png" width="150" height="150" border="0"><br><b>Woohoo!</b><p>Congratulations! <b>Gelinah</b> now has increased Level!!!</p><p></p><form action="fight_training.phtml" method="post"><input type="submit" value="Go Back to the Secret Ninja Training School"></form></center></body></html>
+
     const responseDom = new DOMParser().parseFromString(body, "text/html");
     const p = responseDom.querySelector("p");
 
@@ -581,9 +437,15 @@
     trainingInfo.trainingCell.innerHTML = "";
     trainingInfo.trainingCell.append(p);
 
-    increaseStat(trainingInfo.currentStats, responseDom.textContent);
+    const increasedStatName = increaseStat(
+      trainingInfo.currentStats,
+      responseDom.textContent
+    );
 
-    const nextStat = recommendNextStatToTrain(trainingInfo.currentStats);
+    const nextStat = recommendNextStatToTrain(
+      trainingInfo.currentStats,
+      increasedStatName
+    );
 
     trainingInfo.trainingCell.append(
       getStartForm(trainingInfo.petName, nextStat)
