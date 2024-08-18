@@ -23,7 +23,18 @@
     agility: 201, // Not useful after 201, only used for equipping certain items
     endurance: Infinity,
   };
-  
+
+  /**
+   * @typedef {"codestone" | "dubloon" | "unknown"} ItemType
+   *
+   * @type {Record<ItemType, ItemType>}
+   */
+  const ItemType = {
+    codestone: "codestone",
+    dubloon: "dubloon",
+    unknown: "unknown",
+  };
+
   const DEBUG = false;
 
   // These are the levels at which more codestones need to be used.
@@ -40,17 +51,12 @@
       return;
     }
 
-    getPetTrainingInfo().forEach((row) => {
+    getAllPetsTrainingInfo().forEach((row) => {
+      console.log(row);
       if (row.isCourseActive) {
-        addNotificationListener(row);
-        row.countdowns.forEach(startCountdown);
+        addCountdownListener(row);
       } else {
-        row.trainingCost.forEach(({ element }) => {
-          if (element.nextSibling && element.nextSibling.tagName === "IMG") {
-            element.nextSibling.style = { marginBottom: "10px" };
-          }
-          element.append(getItemSearchForm(element.textContent));
-        });
+        handleTrainingItems(row);
       }
     });
 
@@ -527,6 +533,21 @@
       });
   }
 
+  /**
+   * @typedef {Object} TimeLeft
+   * @property {number} hours
+   * @property {number} minutes
+   * @property {number} seconds
+   *
+   * @typedef {Object} Countdown
+   * @property {HTMLElement} element
+   * @property {boolean} isActualTime
+   * @property {TimeLeft} timeLeft
+   * @property {Date} endTime
+   *
+   * @param {HTMLTableCellElement} trainingCell
+   * @returns {Countdown[]}
+   */
   function getCountdowns(trainingCell) {
     return [...trainingCell.querySelectorAll("b")].flatMap((element) => {
       const match = element.textContent.match(
@@ -557,17 +578,43 @@
     });
   }
 
-  function getTrainingInfo(headerRow) {
-    const matches = headerRow.textContent.match(
-      /^(?<petName>\w+).*currently studying (?<stat>\w+)/
-    );
+  /**
+   * @typedef {Object} ItemInfo
+   * @property {string} itemName
+   * @property {HTMLElement} element
+   * @property {ItemType} itemType
+   * @property {HTMLImageElement?} image
+   *
+   * @param {HTMLElement} nameElement The element containing the item name
+   */
+  function getItemInfo(nameElement) {
+    const itemName = nameElement.textContent;
+    const itemType = nameElement.textContent.includes("Dubloon")
+      ? ItemType.dubloon
+      : nameElement.textContent.includes("Codestone")
+      ? ItemType.codestone
+      : ItemType.unknown;
+
+    let image =
+      nameElement.nextSibling?.tagName === "IMG" ? nameElement.nextSibling : null;
+
+    if (!image && itemType === ItemType.dubloon) {
+      image = nameElement.parentElement.querySelector("img");
+    }
 
     return {
-      petName: matches.groups.petName,
-      stat: matches.groups.stat,
+      itemName,
+      itemType,
+      image,
+      element: nameElement,
     };
   }
 
+  /**
+   *
+   * @param {HTMLTableCellElement} trainingCell
+   * @returns {ItemInfo[]}
+   */
   function getTrainingCost(trainingCell) {
     const itemElements = [...trainingCell.querySelectorAll("b")].filter((b) => {
       return (
@@ -575,39 +622,67 @@
       );
     });
 
-    return itemElements.map((element) => ({
-      itemName: element.textContent,
-      element,
-    }));
+    return itemElements.map(getItemInfo);
   }
 
-  function getPetTrainingInfo() {
+  /**
+   * @typedef {Object} TrainingInfo
+   * @property {HTMLElement} trainingCell
+   * @property {boolean} isCourseActive
+   * @property {Date?} endTime
+   * @property {Countdown[]} countdowns
+   * @property {string} petName
+   * @property {StatName} stat
+   * @property {ItemInfo[]} trainingCost
+   *
+   * @param {HTMLTableRowElement} headerRow
+   * @returns {TrainingInfo}
+   */
+  function getTrainingInfo(headerRow) {
+    const titleRegexMatches = headerRow.textContent.match(
+      /^(?<petName>\w+).*(?:currently studying (?<stat>\w+)|not on a course)/
+    );
+    const bodyRow = headerRow.nextElementSibling;
+    const trainingCell = bodyRow.lastChild;
+    const isCourseActive = bodyRow.textContent.includes(
+      "Time till course finishes"
+    );
+    const countdowns = getCountdowns(trainingCell);
+
+    return {
+      trainingCell,
+      petName: titleRegexMatches.groups.petName,
+      stat: titleRegexMatches.groups.stat,
+      countdowns,
+      isCourseActive,
+      trainingCost: getTrainingCost(trainingCell),
+      endTime: countdowns.find(({ isActualTime }) => isActualTime)?.endTime,
+    };
+  }
+
+  /**
+   * @returns {TrainingInfo[]}
+   */
+  function getAllPetsTrainingInfo() {
     return [...document.querySelectorAll("td.content tr")]
       .filter((tr) => tr.textContent.includes("is currently studying"))
-      .map((headerRow) => {
-        const bodyRow = headerRow.nextElementSibling;
-        const trainingCell = bodyRow.lastChild;
-        const isCourseActive = bodyRow.textContent.includes(
-          "Time till course finishes"
-        );
-        const countdowns = getCountdowns(trainingCell);
+      .map(getTrainingInfo);
+  }
 
-        return {
-          countdowns,
-          trainingCell,
-          isCourseActive,
-          trainingCost: getTrainingCost(trainingCell),
-          ...getTrainingInfo(headerRow),
-          endTime: countdowns.find(({ isActualTime }) => isActualTime)?.endTime,
-        };
-      });
+  function handleTrainingItems(row) {
+    row.trainingCost.forEach(({ element }) => {
+      if (element.nextSibling && element.nextSibling.tagName === "IMG") {
+        element.nextSibling.style = { marginBottom: "10px" };
+      }
+      element.append(getItemSearchForm(element.textContent));
+    });
   }
 
   /**
    * @param {DateTime} date
-   * @returns
+   * @returns {TimeLeft}
    */
-  function getTimeUntil(date) {
+  function getTimeLeftUntil(date) {
     var remainingMs = date.getTime() - new Date().getTime();
     var remainingSeconds = parseInt(remainingMs / 1000);
 
@@ -620,6 +695,11 @@
       minutes,
       seconds,
     };
+  }
+
+  function addCountdownListener(row) {
+    addNotificationListener(row);
+    row.countdowns.forEach(startCountdown);
   }
 
   function addNotificationListener({ petName, stat, endTime, trainingCell }) {
@@ -636,6 +716,7 @@
         petName,
       });
 
+      // Let's use one tick for all of the countdowns for the pet instead of having the nofitication listener separate
       trainingCell.innerHtml = getCompleteForm(petName);
       return;
     }
@@ -651,7 +732,7 @@
         element.textContent = "Course Finished!";
         return;
       }
-      const timeLeft = getTimeUntil(endTime);
+      const timeLeft = getTimeLeftUntil(endTime);
       element.textContent = `${timeLeft.hours} hrs, ${timeLeft.minutes} minutes, ${timeLeft.seconds} seconds`;
       timeoutId = setTimeout(tick, remainingMs % 1000);
     }
