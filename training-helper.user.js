@@ -65,6 +65,9 @@
       return;
     }
 
+    // feature idea: If the pet's level is < 40, check if it's the pet's birthday and recommend they go to the swashbuckling academy for free training.
+    // We can fetch all of the quickref data from this page: await fetch("/quickref.phtml").then(r => r.text())
+
     getAllPetsTrainingInfo().forEach((trainingInfo) => {
       if (DEBUG) console.debug("Training info:", trainingInfo);
 
@@ -210,10 +213,7 @@
     stats[increasedStat] += pointsIncreased;
 
     if (increasedStat === "endurance") {
-      if (stats.currentHitpoints <= stats.endurance) {
-        stats.currentHitpoints += pointsIncreased;
-      }
-
+      stats.currentHitpoints += pointsIncreased;
       stats.elements.endurance.textContent = `${stats.currentHitpoints} / ${stats.endurance}`;
     } else {
       stats.elements[increasedStat].textContent = stats[increasedStat];
