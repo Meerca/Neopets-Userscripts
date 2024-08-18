@@ -180,10 +180,11 @@
      * @type {StatName?}
      */
     var increasedStat = increasedStatsMessage
-      .match(
-        /now has increased (?<statName>strength|defence|endurance|agility|level)/i
-      )
+      .match(/increased (?<statName>strength|defence|endurance|agility|level)/i)
       ?.groups.statName?.toLowerCase();
+
+    if (DEBUG)
+      console.debug("Increased stat:", increasedStatsMessage, increasedStat);
 
     if (!increasedStat) {
       return null;
@@ -200,7 +201,7 @@
 
     let pointsIncreased = 1;
     const bonusPoints = increasedStatsMessage.match(
-      /You went up (?<bonusPoints>\d+) points/i
+      /went up (?<bonusPoints>\d+) points/i
     )?.groups.bonusPoints;
     if (bonusPoints) {
       pointsIncreased = parseInt(bonusPoints);
@@ -438,10 +439,13 @@
    * @param {PetTrainingInfo} trainingInfo
    * @returns {function} A function to remove the event listener
    */
-  function addListenerToCompleteCourseButton(trainingInfo) {
-    const form = trainingInfo.trainingCell.querySelector(
-      'form[action^="process_"]'
-    );
+  function addListenerToCompleteCourseButton(
+    trainingInfo,
+    existingForm = null
+  ) {
+    const form =
+      existingForm ??
+      trainingInfo.trainingCell.querySelector('form[action^="process_"]');
     if (form?.type?.value !== "complete") {
       console.warn("No complete course form found", form);
       return;
@@ -467,24 +471,43 @@
       body: new FormData(form),
     });
 
+    // for testing:
+    const _errorBody = `<div class="errorMessage"><b>Error: </b>Sorry, this pet does not seem to be on a course!</div>`;
+    const _statName = "Endurance";
+    const _successBody = `<style type=text/css>
+A{COLOR:#000099;FONT-FAMILY:verdana,arial,helvetica;FONT-SIZE:9pt;TEXT-DECORATION:none}
+TD,P,body{FONT-FAMILY:verdana,arial,helvetica;FONT-SIZE:9pt;}
+A:hover{COLOR:#990000;}
+.smallfont, .sf{FONT-SIZE:7.5pt;}
+</style>
+<center><IMG src="//pets.neopets.com/cpn/${trainingInfo.petName}/1/2.png" width="150" height="150" border="0"><br><b>Woohoo!</b><p>Congratulations! <b>${trainingInfo.petName}</b> now has increased ${_statName}!!!<p><p><form action='academy.phtml' method='get'><input type='submit' value='Back to the Swashbuckling Academy'></form>`;
+
     const body = await response.text();
-
-    // process the response body as HTML, and get the paragraph out to display
-
-    // Possible response: <div class="errorMessage"><b>Error: </b>Sorry, this pet does not seem to be on a course!</div>
-
-    // <html><head></head><body><center><img src="//pets.neopets.com/cpn/PetName/1/2.png" width="150" height="150" border="0"><br><b>Woohoo!</b><p>Congratulations! <b>PetName</b> now has increased Level!!!</p><p></p><form action="fight_training.phtml" method="post"><input type="submit" value="Go Back to the Secret Ninja Training School"></form></center></body></html>
 
     const responseDom = new DOMParser().parseFromString(body, "text/html");
 
     trainingInfo.trainingCell.innerHTML = "";
-    [...responseDom.querySelectorAll("p")].forEach((p) =>
-      trainingInfo.trainingCell.append(p)
-    );
+
+    const errorMessage = responseDom.querySelector(".errorMessage");
+    if (errorMessage) {
+      trainingInfo.trainingCell.append(errorMessage);
+      trainingInfo.trainingCell.append(document.createElement("br"));
+      trainingInfo.trainingCell.append(
+        createStartCourseForm(
+          trainingInfo.petName,
+          recommendNextStatToTrain(trainingInfo.currentStats)
+        )
+      );
+      return;
+    }
+
+    const paragraphs = [...responseDom.querySelectorAll("p")];
+
+    paragraphs.forEach((p) => trainingInfo.trainingCell.append(p));
 
     const increasedStatName = increaseStat(
       trainingInfo.currentStats,
-      responseDom.textContent
+      paragraphs.map((p) => p.textContent).join(" ")
     );
 
     const nextStat = recommendNextStatToTrain(
@@ -687,6 +710,12 @@
     };
   }
 
+  function addCourseCompleteForm(trainingInfo) {
+    const form = createCompleteCourseForm(trainingInfo);
+    trainingInfo.trainingCell.append(form);
+    addListenerToCompleteCourseButton(trainingInfo, form);
+  }
+
   /**
    * @param {PetTrainingInfo} trainingInfo
    */
@@ -708,9 +737,7 @@
     });
 
     trainingCell.innerHtml = "";
-    trainingCell.append(createCompleteCourseForm(trainingInfo));
-
-    addListenerToCompleteCourseButton(trainingInfo);
+    addCourseCompleteForm(trainingInfo);
   }
 
   /**
