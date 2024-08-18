@@ -52,9 +52,8 @@
     }
 
     getAllPetsTrainingInfo().forEach((row) => {
-      console.log(row);
       if (row.isCourseActive) {
-        addCountdownListener(row);
+        startCountdownTracker(row);
       } else {
         handleTrainingItems(row);
       }
@@ -596,7 +595,9 @@
       : ItemType.unknown;
 
     let image =
-      nameElement.nextSibling?.tagName === "IMG" ? nameElement.nextSibling : null;
+      nameElement.nextSibling?.tagName === "IMG"
+        ? nameElement.nextSibling
+        : null;
 
     if (!image && itemType === ItemType.dubloon) {
       image = nameElement.parentElement.querySelector("img");
@@ -626,7 +627,7 @@
   }
 
   /**
-   * @typedef {Object} TrainingInfo
+   * @typedef {Object} PetTrainingInfo
    * @property {HTMLElement} trainingCell
    * @property {boolean} isCourseActive
    * @property {Date?} endTime
@@ -636,7 +637,7 @@
    * @property {ItemInfo[]} trainingCost
    *
    * @param {HTMLTableRowElement} headerRow
-   * @returns {TrainingInfo}
+   * @returns {PetTrainingInfo}
    */
   function getTrainingInfo(headerRow) {
     const titleRegexMatches = headerRow.textContent.match(
@@ -661,7 +662,7 @@
   }
 
   /**
-   * @returns {TrainingInfo[]}
+   * @returns {PetTrainingInfo[]}
    */
   function getAllPetsTrainingInfo() {
     return [...document.querySelectorAll("td.content tr")]
@@ -697,43 +698,55 @@
     };
   }
 
-  function addCountdownListener(row) {
-    addNotificationListener(row);
-    row.countdowns.forEach(startCountdown);
-  }
+  /**
+   * @param {PetTrainingInfo} trainingInfo
+   */
+  function handleTrainingComplete(trainingInfo) {
+    const { petName, stat, trainingCell, countdowns } = trainingInfo;
 
-  function addNotificationListener({ petName, stat, endTime, trainingCell }) {
-    let timeoutId;
-    function tick() {
-      if (timeoutId) clearTimeout(timeoutId);
-      const remainingMs = endTime.getTime() - new Date().getTime();
-      if (remainingMs > 1000) {
-        timeoutId = setTimeout(tick, 1000);
+    sendNotification("Course Finished!", {
+      body: petName + " has finished studying " + stat + ".",
+      petName,
+    });
+
+    countdowns.forEach(({ element, isActualTime }) => {
+      if (!isActualTime) {
+        element.remove();
         return;
       }
-      sendNotification("Course Finished!", {
-        body: petName + " has finished studying " + stat + ".",
-        petName,
-      });
 
-      // Let's use one tick for all of the countdowns for the pet instead of having the nofitication listener separate
-      trainingCell.innerHtml = getCompleteForm(petName);
-      return;
-    }
-    tick();
+      element.textContent = "Course Finished!";
+    });
+
+    // todo: this doesn't seem to be working right now.
+    // Let's use one tick for all of the countdowns for the pet instead of having the nofitication listener separate
+    trainingCell.innerHtml = getCompleteForm(petName);
   }
 
-  function startCountdown({ element, endTime }) {
-    let timeoutId;
-    function tick() {
-      if (timeoutId) clearTimeout(timeoutId);
-      const remainingMs = endTime.getTime() - new Date().getTime();
-      if (remainingMs <= 0) {
-        element.textContent = "Course Finished!";
-        return;
-      }
+  /**
+   * @param {PetTrainingInfo} trainingInfo
+   */
+  function updateCountdowns(trainingInfo) {
+    trainingInfo.countdowns.forEach(({ element, endTime }) => {
       const timeLeft = getTimeLeftUntil(endTime);
       element.textContent = `${timeLeft.hours} hrs, ${timeLeft.minutes} minutes, ${timeLeft.seconds} seconds`;
+    });
+  }
+
+  /**
+   *
+   * @param {PetTrainingInfo} trainingInfo
+   */
+  function startCountdownTracker(trainingInfo) {
+    let timeoutId;
+    function tick() {
+      if (timeoutId) clearTimeout(timeoutId);
+      const remainingMs = trainingInfo.endTime.getTime() - new Date().getTime();
+      if (remainingMs <= 0) {
+        handleTrainingComplete(trainingInfo);
+        return;
+      }
+      updateCountdowns(trainingInfo);
       timeoutId = setTimeout(tick, remainingMs % 1000);
     }
     tick();
