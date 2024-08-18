@@ -2,11 +2,13 @@
 // @name         Neopets Training Helper
 // @author       Hiddenist
 // @namespace    https://hiddenist.com
-// @version      2024-08-17-alpha
+// @version      2024-08-17-alpha2
 // @description  Makes codestone training your pet require fewer clicks and less math.
 // @match        http*://www.neopets.com/island/fight_training.phtml*
 // @match        http*://www.neopets.com/island/training.phtml*
 // @match        http*://www.neopets.com/pirates/academy.phtml*
+// @grant        GM_getValue
+// @grant        GM_setValue
 // @updateURL    https://github.com/Meerca/Neopets-Userscripts/raw/main/training-helper.user.js
 // @downloadURL  https://github.com/Meerca/Neopets-Userscripts/raw/main/training-helper.user.js
 // @supportURL   https://github.com/Meerca/Neopets-Userscripts/issues
@@ -16,32 +18,38 @@
   const DEBUG = false;
 
   /**
-   * @typedef {keyof typeof maxTraining} StatName
-   */
-
-  /**
-   * The maximum level to train each stat to.
-   */
-  const maxTraining = {
-    strength: 750, // Does nothing after 750
-    defence: 750, // Does nothing after 750
-    agility: 201, // Not useful after 201, only used for equipping certain items
-    endurance: Infinity,
-    level: Infinity,
-  };
-
-  /**
+   * @typedef {"strength" | "defence" | "agility" | "endurance" | "level"} StatName
    * @typedef {keyof typeof ItemType} ItemType
+   * @typedef {keyof typeof TrainingStatus} TrainingStatus
    */
+
+  const configuration = Object.seal({
+    /**
+     * The maximum level to train each stat to.
+     */
+    maxStats: {
+      strength: 750, // Does nothing after 750
+      defence: 750, // Does nothing after 750
+      agility: 201, // Not useful after 201, only used for equipping certain items
+      endurance: Infinity,
+      level: Infinity,
+    },
+    notifications: {
+      enabled: GM_getValue("notifications.enabled", false),
+      idleReminder: {
+        enabled: GM_getValue("notifications.idleReminder.enabled", false),
+        intervalInMs: 1000 * 60,
+        thresholdInMs: GM_getValue("notifications.idleReminder.thresholdInMs", 1000 * 60),
+      },
+    },
+  });
+
   const ItemType = {
     codestone: "codestone",
     dubloon: "dubloon",
     unknown: "unknown",
   };
 
-  /**
-   * @typedef {keyof typeof TrainingStatus} TrainingStatus
-   */
   const TrainingStatus = {
     noCourseStarted: "noCourseStarted",
     active: "active",
@@ -69,7 +77,7 @@
       }
     });
 
-    addRequestNotificationButton();
+    addConfigurationForm();
   }
 
   function isStatusPage() {
@@ -257,26 +265,62 @@
     return fallbackValue;
   }
 
-  function createForm({ action, method, children, onSubmit }) {
-    const form = document.createElement("form");
-    form.action = action;
-    form.method = method;
-    children.forEach((child) => form.append(child));
+  /**
+   * @typedef {Object} ElementProps
+   * @property {string?} textContent
+   * @property {Array<Node> | Node | undefined} children
+   * @property {string?} className
+   * @property {string?} id
+   *
+   * @param {string} tagName 
+   * @param {ElementProps?} props
+   * @returns 
+   */
+  function createElement(tagName, { textContent, children = [], className, id } = {}) {
+    const element = document.createElement(tagName);
+    if (textContent) element.textContent = textContent;
+    if (className) element.className = className;
+    if (id) element.id = id;
+
+    if (!Array.isArray(children) && children) {
+      children = [children];
+    }
+    children.forEach((child) => element.append(child));
+    return element;
+  }
+
+  function createForm({ action, method, onSubmit, ...elementProps }) {
+    const form = createElement("form", elementProps);
+    if (action) form.action = action;
+    if (method) form.method = method;
     if (onSubmit) form.addEventListener("submit", onSubmit);
     return form;
   }
 
-  function createInput({ name, value, type }) {
-    const input = document.createElement("input");
-    input.name = name;
-    input.value = value;
-    input.type = type;
-    return input;
+  function createInput({ label, name, value, type, ...elementProps }) {
+    const input = createElement("input", elementProps);
+    if (name) input.name = name;
+    if (value) input.value = value;
+    if (type) input.type = type;
+
+    if (!label) return input;
+
+    const labelElement = document.createElement("label");
+    const labelText = document.createElement("span");
+    labelText.textContent = label;
+    labelElement.append(labelText);
+
+    if (type === "checkbox" || type === "radio") {
+      labelElement.prepend(input); 
+    } else  {
+      labelElement.append(input);
+    }
+    return labelElement;
   }
 
-  function createSelect({ name, value, options }) {
-    const select = document.createElement("select");
-    select.name = name;
+  function createSelect({ name, value, options, ...elementProps }) {
+    const select = createElement("select", elementProps);
+    if (name) select.name = name;
 
     options.forEach((option) => {
       const optionElement = document.createElement("option");
@@ -689,27 +733,106 @@
     tick();
   }
 
-  function addRequestNotificationButton() {
-    if (Notification.permission === "granted" && !DEBUG) {
+  function addConfigurationForm() {
+    const container = document.createElement("div");
+    const shadow = container.attachShadow({ mode: "open" });
+
+    const styles = document.createElement("style");
+    styles.textContent = `
+      h2, h3 {
+        margin: 0;
+      }
+
+      form {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        max-width: 300px;
+        margin: 16px;
+        text-align: left;
+        padding: 16px;
+        border: 1px solid #ccc;
+      }
+
+      label > input + span {
+        margin-left: 4px;
+      }
+
+      label > span + input {
+        display: block;
+        margin-top: 4px;
+      }
+
+      .save-button {
+        margin-top: 16px;
+      }
+    `;
+
+    shadow.append(styles);
+
+    shadow.append(createForm({
+      shadowRoot: true,
+      children: [
+        createElement("h2", { textContent: "Training Helper" }),
+        createElement("h3", { textContent: "Configuration" }),
+        createInput({
+          label: "Enable Notifications",
+          name: "notificationsEnabled",
+          value: configuration.notifications.enabled,
+          type: "checkbox",
+        }),
+        createInput({
+          label: "Enable Idle Reminder",
+          name: "idleReminderEnabled",
+          value: configuration.notifications.idleReminder.enabled,
+          type: "checkbox",
+        }),
+        createInput({
+          label: "Idle Threshold (minutes)",
+          name: "idleThreshold",
+          value: Math.round(configuration.notifications.idleReminder.thresholdInMs / (1000 * 60)),
+          type: "number",
+        }),
+        createInput({ type: "submit", value: "Save", className: "save-button" }),
+        
+        createElement("small", { textContent: "Note: Right now this form doesn't save, sorry!" }),
+      ],
+      onSubmit: (e) => {
+        if (DEBUG) console.debug("Form submitted", e);
+        e.preventDefault();
+        configuration.notifications.enabled = e.target.notificationsEnabled.checked;
+        GM_setValue("notifications.enabled", configuration.notifications.enabled);
+
+        configuration.notifications.idleReminder.enabled = e.target.idleReminderEnabled.checked;
+        GM_setValue("notifications.idleReminder.enabled", configuration.notifications.idleReminder.enabled);
+
+        configuration.notifications.idleReminder.thresholdInMs = e.target.idleThreshold.value * 1000 * 60;
+        GM_setValue("notifications.idleReminder.thresholdInMs", configuration.notifications.idleReminder.thresholdInMs);
+
+        if (configuration.notifications.idleReminder.enabled) {
+          requestNotificationPermission();
+        }
+      },
+    }));
+
+    const parent = document.querySelector("#content td.content") ?? document.body;
+
+    parent.append(container);
+  }
+
+  function requestNotificationPermission() {
+    if (Notification.permission === "granted") {
       return;
     }
 
-    const button = document.createElement("button");
-    button.textContent = "Enable Notifications for Training Helper";
-    button.style.fontSize = "1.5em";
-    button.style.margin = "16px auto";
-    button.onclick = function () {
-      Notification.requestPermission().then((result) => {
-        if (result === "granted") {
-          sendNotification("Notifications enabled!", {
-            body: "You will now receive notifications from the Training Helper.",
-          });
-          button.remove();
-        }
-      });
-    };
-
-    document.querySelector("td.content p").prepend(button);
+    Notification.requestPermission().then((result) => {
+      if (result === "granted") {
+        sendNotification("Notifications enabled!", {
+          body: "You will now receive notifications from the Training Helper.",
+        });
+        button.remove();
+      }
+    });
   }
 
   main();
