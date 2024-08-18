@@ -2,7 +2,7 @@
 // @name         Neopets Training Helper
 // @author       Hiddenist
 // @namespace    https://hiddenist.com
-// @version      2024-08-17-alpha4
+// @version      2024-08-18-alpha5
 // @description  Makes codestone training your pet require fewer clicks and less math.
 // @match        http*://www.neopets.com/island/fight_training.phtml*
 // @match        http*://www.neopets.com/island/training.phtml*
@@ -261,23 +261,24 @@
   }
 
   /**
-   * @param {StatsWithElements | Omit<StatsWithElements, "elements">} stats
+   * @param {Record<StatName, number>>} stats
    * @returns {StatName}
    */
-  function recommendNextStatToTrain({ elements: _, ...stats }, fallbackValue = "level") {
+  function recommendNextStatToTrain(stats, fallbackValue = "level") {
     let lowestStat = null;
     let highestStat = null;
 
+    const statNames = ["strength", "defence", "agility", "endurance"];
+
     // Current logic just trains the lowest stat that isn't maxed out yet, but there's some stuff we should add for recommending training endurance up to 3x instead of when it's lowest.
-    for (const stat in stats) {
-      if (stat === "level" || stats[stat] > configuration.maxStats[stat]) continue;
+    for (const stat of statNames) {
+      if (stats[stat] > configuration.maxStats[stat]) continue;
       if (!lowestStat || stats[stat] < stats[lowestStat]) {
         lowestStat = stat;
       }
     }
 
-    for (const stat in stats) {
-      if (stat === "level") continue;
+    for (const stat of statNames) {
       if (!highestStat || stats[stat] > stats[highestStat]) {
         highestStat = stat;
       }
@@ -840,52 +841,76 @@ A:hover{COLOR:#990000;}
 
     shadow.append(styles);
 
-    shadow.append(createForm({
-      shadowRoot: true,
-      children: [
-        createElement("h2", { textContent: "Training Helper" }),
-        createElement("h3", { textContent: "Configuration" }),
-        createInput({
-          label: "Enable Notifications",
-          name: "notificationsEnabled",
-          value: configuration.notifications.enabled,
-          type: "checkbox",
-        }),
-        createInput({
-          label: "Enable Idle Reminder",
-          name: "idleReminderEnabled",
-          value: configuration.notifications.idleReminder.enabled,
-          type: "checkbox",
-        }),
-        createInput({
-          label: "Idle Threshold (minutes)",
-          name: "idleThreshold",
-          value: Math.round(configuration.notifications.idleReminder.thresholdInMs / (1000 * 60)),
-          type: "number",
-        }),
-        createInput({ type: "submit", value: "Save", className: "save-button" }),
-        
-        createElement("small", { textContent: "Note: Right now this form doesn't save, sorry!" }),
-      ],
-      onSubmit: (e) => {
-        if (DEBUG) console.debug("Form submitted", e);
-        e.preventDefault();
-        configuration.notifications.enabled = e.target.notificationsEnabled.checked;
-        GM_setValue("notifications.enabled", configuration.notifications.enabled);
+    shadow.append(
+      createForm({
+        shadowRoot: true,
+        children: [
+          createElement("h2", { textContent: "Training Helper" }),
+          createElement("h3", { textContent: "Configuration" }),
+          createInput({
+            label: "Enable Notifications",
+            name: "notificationsEnabled",
+            value: configuration.notifications.enabled,
+            type: "checkbox",
+          }),
+          createInput({
+            label: "Enable Idle Reminder",
+            name: "idleReminderEnabled",
+            value: configuration.notifications.idleReminder.enabled,
+            type: "checkbox",
+          }),
+          createInput({
+            label: "Idle Threshold (minutes)",
+            name: "idleThreshold",
+            value: Math.round(
+              configuration.notifications.idleReminder.thresholdInMs /
+                (1000 * 60)
+            ),
+            type: "number",
+          }),
+          createInput({
+            type: "submit",
+            value: "Save",
+            className: "save-button",
+          }),
 
-        configuration.notifications.idleReminder.enabled = e.target.idleReminderEnabled.checked;
-        GM_setValue("notifications.idleReminder.enabled", configuration.notifications.idleReminder.enabled);
+          createElement("small", {
+            textContent: "Note: Right now this form doesn't save, sorry!",
+          }),
+        ],
+        onSubmit: (e) => {
+          if (DEBUG) console.debug("Form submitted", e);
+          e.preventDefault();
+          configuration.notifications.enabled =
+            e.target.notificationsEnabled.checked;
+          GM_setValue(
+            "notifications.enabled",
+            configuration.notifications.enabled
+          );
 
-        configuration.notifications.idleReminder.thresholdInMs = e.target.idleThreshold.value * 1000 * 60;
-        GM_setValue("notifications.idleReminder.thresholdInMs", configuration.notifications.idleReminder.thresholdInMs);
+          configuration.notifications.idleReminder.enabled =
+            e.target.idleReminderEnabled.checked;
+          GM_setValue(
+            "notifications.idleReminder.enabled",
+            configuration.notifications.idleReminder.enabled
+          );
 
-        if (configuration.notifications.idleReminder.enabled) {
-          requestNotificationPermission();
-        }
-      },
-    }));
+          configuration.notifications.idleReminder.thresholdInMs =
+            e.target.idleThreshold.value * 1000 * 60;
+          GM_setValue(
+            "notifications.idleReminder.thresholdInMs",
+            configuration.notifications.idleReminder.thresholdInMs
+          );
 
-    const parent = document.querySelector("#content td.content") ?? document.body;
+          if (configuration.notifications.idleReminder.enabled) {
+            requestNotificationPermission();
+          }
+        },
+      })
+    );
+
+    const parent =
+      document.querySelector("#content td.content") ?? document.body;
 
     parent.append(container);
   }
