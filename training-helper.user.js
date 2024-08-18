@@ -15,7 +15,7 @@
 // ==/UserScript==
 (function () {
   ("use strict");
-  const DEBUG = false;
+  const DEBUG = true;
 
   /**
    * @typedef {"strength" | "defence" | "agility" | "endurance" | "level"} StatName
@@ -39,7 +39,10 @@
       idleReminder: {
         enabled: GM_getValue("notifications.idleReminder.enabled", false),
         intervalInMs: 1000 * 60,
-        thresholdInMs: GM_getValue("notifications.idleReminder.thresholdInMs", 1000 * 60),
+        thresholdInMs: GM_getValue(
+          "notifications.idleReminder.thresholdInMs",
+          1000 * 60
+        ),
       },
     },
   });
@@ -272,11 +275,14 @@
    * @property {string?} className
    * @property {string?} id
    *
-   * @param {string} tagName 
+   * @param {string} tagName
    * @param {ElementProps?} props
-   * @returns 
+   * @returns
    */
-  function createElement(tagName, { textContent, children = [], className, id } = {}) {
+  function createElement(
+    tagName,
+    { textContent, children = [], className, id } = {}
+  ) {
     const element = document.createElement(tagName);
     if (textContent) element.textContent = textContent;
     if (className) element.className = className;
@@ -311,8 +317,8 @@
     labelElement.append(labelText);
 
     if (type === "checkbox" || type === "radio") {
-      labelElement.prepend(input); 
-    } else  {
+      labelElement.prepend(input);
+    } else {
       labelElement.append(input);
     }
     return labelElement;
@@ -434,16 +440,19 @@
    */
   function addListenerToCompleteCourseButton(trainingInfo) {
     const form = trainingInfo.trainingCell.querySelector(
-      'form[action^="process_]'
+      'form[action^="process_"]'
     );
-    if (!form?.type?.value !== "complete") return;
+    if (form?.type?.value !== "complete") {
+      console.warn("No complete course form found", form);
+      return;
+    }
 
     const listener = async (e) => {
       e.preventDefault();
       await submitCourseCompletedForm(form, trainingInfo);
     };
 
-    form.addEventListener("submit", submitCourseCompletedForm);
+    form.addEventListener("submit", listener);
 
     return () => form.removeEventListener("submit", listener);
   }
@@ -464,14 +473,14 @@
 
     // Possible response: <div class="errorMessage"><b>Error: </b>Sorry, this pet does not seem to be on a course!</div>
 
-    // <html><head></head><body><center><img src="//pets.neopets.com/cpn/Gelinah/1/2.png" width="150" height="150" border="0"><br><b>Woohoo!</b><p>Congratulations! <b>Gelinah</b> now has increased Level!!!</p><p></p><form action="fight_training.phtml" method="post"><input type="submit" value="Go Back to the Secret Ninja Training School"></form></center></body></html>
+    // <html><head></head><body><center><img src="//pets.neopets.com/cpn/PetName/1/2.png" width="150" height="150" border="0"><br><b>Woohoo!</b><p>Congratulations! <b>PetName</b> now has increased Level!!!</p><p></p><form action="fight_training.phtml" method="post"><input type="submit" value="Go Back to the Secret Ninja Training School"></form></center></body></html>
 
     const responseDom = new DOMParser().parseFromString(body, "text/html");
-    const p = responseDom.querySelector("p");
 
-    // remove children from the training cell
     trainingInfo.trainingCell.innerHTML = "";
-    trainingInfo.trainingCell.append(p);
+    [...responseDom.querySelectorAll("p")].forEach((p) =>
+      trainingInfo.trainingCell.append(p)
+    );
 
     const increasedStatName = increaseStat(
       trainingInfo.currentStats,
