@@ -43,17 +43,9 @@
           "notifications.enabled",
           Notification.permission === "granted"
         ) && Notification.permission === "granted",
-      idleReminder: {
-        enabled: GM_getValue("notifications.idleReminder.enabled", false),
-        intervalInMs: 1000 * 60,
-        thresholdInMs: GM_getValue(
-          "notifications.idleReminder.thresholdInMs",
-          1000 * 60
-        ),
-      },
     },
     freebies: {
-      enabled: true
+      enabled: true,
     },
     quickrefLookup: {
       shouldCache: true,
@@ -1265,17 +1257,30 @@
         }
   
         form {
-          display: flex;
-          flex-direction: column;
-          gap: 16px;
           width: fit-content;
           margin: 0;
           margin-top: 8px;
           text-align: left;
           padding: 16px;
+          background: #fafafa;
+        }
+
+        form, fieldset {
+          display: flex;
+          flex-direction: column;
+          gap: 16px;
           border: 1px solid #ccc;
           border-radius: 4px;
-          background: #fafafa;
+        }
+
+        fieldset {
+          padding: 16px;
+          background: #fefefe;
+        }
+
+        legend {
+          padding: 0 4px;
+          font-weight: bold;
         }
   
         label > input + span {
@@ -1288,7 +1293,6 @@
         }
   
         .save-button {
-          margin-top: 16px;
           padding: 8px;
           background: #5C73A0;
           color: white;
@@ -1311,26 +1315,18 @@
       const form = UI.createForm({
         shadowRoot: true,
         children: [
-          UI.createInput({
-            label: "Enable Notifications",
-            name: "notificationsEnabled",
-            checked: configuration.notifications.enabled,
-            type: "checkbox",
-          }),
-          UI.createInput({
-            label: "Enable Idle Reminder",
-            name: "idleReminderEnabled",
-            checked: configuration.notifications.idleReminder.enabled,
-            type: "checkbox",
-          }),
-          UI.createInput({
-            label: "Idle Threshold (minutes)",
-            name: "idleThreshold",
-            value: Math.round(
-              configuration.notifications.idleReminder.thresholdInMs /
-                (1000 * 60)
-            ),
-            type: "number",
+          UI.createElement("fieldset", {
+            children: [
+              UI.createElement("legend", {
+                textContent: "Notification Settings",
+              }),
+              UI.createInput({
+                label: "Enable Notifications",
+                name: "notificationsEnabled",
+                checked: configuration.notifications.enabled,
+                type: "checkbox",
+              }),
+            ],
           }),
           UI.createInput({
             type: "submit",
@@ -1350,20 +1346,6 @@
           if (configuration.notifications.enabled) {
             Notifier.requestNotificationPermission();
           }
-
-          configuration.notifications.idleReminder.enabled =
-            e.target.idleReminderEnabled.checked;
-          GM_setValue(
-            "notifications.idleReminder.enabled",
-            configuration.notifications.idleReminder.enabled
-          );
-
-          configuration.notifications.idleReminder.thresholdInMs =
-            e.target.idleThreshold.value * 1000 * 60;
-          GM_setValue(
-            "notifications.idleReminder.thresholdInMs",
-            configuration.notifications.idleReminder.thresholdInMs
-          );
         },
       });
 
@@ -1417,8 +1399,6 @@
         body,
         petName = undefined,
         previousNotification = null,
-        idleCheckId = null,
-        shouldAddIdleCheck = true,
         previousTitle = document.title,
         onClickNotification = null,
       }
@@ -1442,55 +1422,16 @@
         body: body,
       });
 
-      if (!idleCheckId && shouldAddIdleCheck) {
-        idleCheckId = Notifier.setReturnFromIdleReminder(() => {
-          Notifier.sendNotification(title, {
-            body,
-            petName,
-            previousNotification: notification,
-            idleCheckId,
-            shouldAddIdleCheck,
-            previousTitle,
-            onClickNotification,
-          });
-        });
-      }
-
       // the page does not reopen when clicking the notification if the browser tab was closed
       // We can listen on the homepage of neopets and check something like this to reopen the page if we want
       // GM_setValue("notificationUrl", window.location.href);
 
       notification.onclick = () => {
         // GM_deleteValue("notificationUrl");
-        if (idleCheckId) clearInterval(idleCheckId);
         notification.close();
         document.title = previousTitle;
         onClickNotification?.();
       };
-    }
-
-    /**
-     * Runs a callback if a machine returns from idle.
-     * @param {function} onReturnFromIdleDetected - Callback to run when the machine returns from idle.
-     * @param {number} intervalInMs - How often to check for idle in milliseconds.
-     * @param {number} idleThresholdInMs - How long the machine must be idle before running the callback.
-     */
-    static setReturnFromIdleReminder(
-      onReturnFromIdleDetected,
-      intervalInMs = 1000 * 60,
-      idleThresholdInMs = 1000 * 60
-    ) {
-      let intervalLastChecked = new Date();
-
-      return setInterval(function () {
-        const now = new Date();
-        const timePassedSinceLastInterval =
-          now.getTime() - intervalLastChecked.getTime();
-        intervalLastChecked = now;
-        if (timePassedSinceLastInterval > intervalInMs + idleThresholdInMs) {
-          onReturnFromIdleDetected();
-        }
-      }, intervalInMs);
     }
   }
 
