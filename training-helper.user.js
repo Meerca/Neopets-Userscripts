@@ -51,26 +51,26 @@
   });
 
   function main() {
-    if (!CurrentPage.isStatusPage()) {
+    if (!TrainingPage.isStatusPage()) {
       return;
     }
 
     UI.addStyles();
     UI.addConfigurationForm();
 
-    const allPets = PetTrainingInfo.getForAllPets();
+    const allPets = PetCourseInfo.getForAllPets();
 
     // feature to add: if a pet is too high of a level for the school, and not on a course, we should remove them from the big list and instead show a message at the bottom of who can't go
     allPets.forEach((pet) => {
       if (DEBUG) console.debug("Training info:", pet);
       switch (pet.status) {
-        case PetTrainingInfo.Status.noCourseStarted:
+        case PetCourseInfo.Status.noCourseStarted:
           return pet.addStartCourseForm();
-        case PetTrainingInfo.Status.active:
+        case PetCourseInfo.Status.active:
           return pet.startCountdownTracker();
-        case PetTrainingInfo.Status.finished:
+        case PetCourseInfo.Status.finished:
           return pet.addAjaxListenerToCompleteCourseForm();
-        case PetTrainingInfo.Status.needsPayment:
+        case PetCourseInfo.Status.needsPayment:
           return pet.updatePaymentUI();
       }
     });
@@ -84,34 +84,42 @@
     }
   }
 
-  class CurrentPage {
-    static PirateSchool = "pirate";
-    static RegularSchool = "regular";
-    static SecretSchool = "secret";
+  class TrainingPage {
+    static SchoolType = Object.freeze({
+      Pirate: "pirate",
+      Regular: "regular",
+      Secret: "secret",
+    });
 
     static getTrainingSchool() {
       switch (window.location.pathname) {
         case "/pirates/academy.phtml":
-          return CurrentPage.PirateSchool;
+          return TrainingPage.SchoolType.Pirate;
         case "/island/training.phtml":
-          return CurrentPage.RegularSchool;
+          return TrainingPage.SchoolType.Regular;
         case "/island/fight_training.phtml":
-          return CurrentPage.SecretSchool;
+          return TrainingPage.SchoolType.Secret;
         default:
           return null;
       }
     }
 
     static isPirateSchool() {
-      return CurrentPage.getTrainingSchool() === CurrentPage.PirateSchool;
+      return (
+        TrainingPage.getTrainingSchool() === TrainingPage.SchoolType.Pirate
+      );
     }
 
     static isRegularSchool() {
-      return CurrentPage.getTrainingSchool() === CurrentPage.RegularSchool;
+      return (
+        TrainingPage.getTrainingSchool() === TrainingPage.SchoolType.Regular
+      );
     }
 
     static isSecretSchool() {
-      return CurrentPage.getTrainingSchool() === CurrentPage.SecretSchool;
+      return (
+        TrainingPage.getTrainingSchool() === TrainingPage.SchoolType.Secret
+      );
     }
 
     static isStatusPage() {
@@ -130,9 +138,9 @@
     }
   }
 
-  class PetTrainingInfo {
+  class PetCourseInfo {
     /**
-     * @typedef {(typeof PetTrainingInfo.Status)[keyof typeof PetTrainingInfo.Status]} PetTrainingStatus
+     * @typedef {(typeof PetCourseInfo.Status)[keyof typeof PetCourseInfo.Status]} PetTrainingStatus
      */
     static Status = Object.freeze({
       noCourseStarted: "noCourseStarted",
@@ -163,12 +171,12 @@
        * @readonly
        */
       this.status = headerRow.textContent.includes("is not on a course")
-        ? PetTrainingInfo.Status.noCourseStarted
+        ? PetCourseInfo.Status.noCourseStarted
         : bodyRow.textContent.includes("Time till course finishes")
-        ? PetTrainingInfo.Status.active
+        ? PetCourseInfo.Status.active
         : bodyRow.textContent.includes("Course Finished!")
-        ? PetTrainingInfo.Status.finished
-        : PetTrainingInfo.Status.needsPayment;
+        ? PetCourseInfo.Status.finished
+        : PetCourseInfo.Status.needsPayment;
 
       /**
        * @type {HTMLElement}
@@ -182,7 +190,7 @@
        * @public
        * @readonly
        */
-      this.currentStats = PetTrainingInfo.getCurrentStats(bodyRow.firstChild);
+      this.currentStats = PetCourseInfo.getCurrentStats(bodyRow.firstChild);
 
       /**
        * @type {string}
@@ -202,13 +210,13 @@
        * @public
        * @readonly
        */
-      this.countdowns = PetTrainingInfo.getCountdowns(this.trainingCell);
+      this.countdowns = PetCourseInfo.getCountdowns(this.trainingCell);
 
       /**
        * @type {ItemInfo[]}
        * @public
        */
-      this.trainingCost = PetTrainingInfo.getTrainingCost(this.trainingCell);
+      this.trainingCost = PetCourseInfo.getTrainingCost(this.trainingCell);
 
       /**
        * @type {Date?}
@@ -220,7 +228,7 @@
     }
 
     /**
-     * @returns {PetTrainingInfo[]}
+     * @returns {PetCourseInfo[]}
      */
     static getForAllPets() {
       return [...document.querySelectorAll("td.content tr")]
@@ -229,7 +237,7 @@
             tr.textContent.includes("is currently studying") ||
             tr.textContent.includes("is not on a course")
         )
-        .map((tr) => new PetTrainingInfo(tr));
+        .map((tr) => new PetCourseInfo(tr));
     }
 
     /**
@@ -815,7 +823,7 @@
   class Freebies {
     /**
      * @param {PetInfo} petInfo
-     * @param {PetTrainingInfo} trainingInfo
+     * @param {PetCourseInfo} trainingInfo
      * @returns {void}
      */
     static checkFreebies(petInfo, trainingInfo) {
@@ -941,7 +949,7 @@
     }
 
     /**
-     * @param {PetTrainingInfo} trainingInfo
+     * @param {PetCourseInfo} trainingInfo
      * @returns {void}
      * @private
      */
@@ -970,7 +978,7 @@
     }
 
     /**
-     * @param {PetTrainingInfo} trainingInfo
+     * @param {PetCourseInfo} trainingInfo
      * @param {string} species
      * @returns {void}
      * @private
@@ -983,7 +991,7 @@
             UI.createElement("strong", {
               textContent: `Happy ${species} Day!`,
             }),
-            CurrentPage.isPirateSchool()
+            TrainingPage.isPirateSchool()
               ? UI.createElement("p", {
                   textContent: "Your training is free here today!",
                 })
@@ -1201,7 +1209,7 @@
      */
     static createCompleteCourseForm(petName) {
       return UI.createForm({
-        action: "process_" + CurrentPage.getScriptName(),
+        action: "process_" + TrainingPage.getScriptName(),
         method: "post",
         children: [
           UI.createInput({ name: "type", value: "complete", type: "hidden" }),
@@ -1222,7 +1230,7 @@
      */
     static createStartCourseForm(petName, selectedStat) {
       return UI.createForm({
-        action: "process_" + CurrentPage.getScriptName(),
+        action: "process_" + TrainingPage.getScriptName(),
         method: "post",
         children: [
           UI.createInput({ name: "type", value: "start", type: "hidden" }),
@@ -1451,7 +1459,7 @@
 
       shadow.append(details);
 
-      const navBar = CurrentPage.getNavBar();
+      const navBar = TrainingPage.getNavBar();
       if (navBar) {
         navBar.after(container);
       } else {
