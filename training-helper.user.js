@@ -2,7 +2,7 @@
 // @name         Neopets Training Helper
 // @author       Hiddenist
 // @namespace    https://hiddenist.com
-// @version      2024-08-19-beta0
+// @version      2024-08-19-beta1
 // @description  Makes codestone training your pet require fewer clicks and less math.
 // @match        http*://www.neopets.com/island/fight_training.phtml*
 // @match        http*://www.neopets.com/island/training.phtml*
@@ -22,8 +22,6 @@
 
   /**
    * @typedef {"strength" | "defence" | "agility" | "endurance" | "level"} StatName
-   * @typedef {keyof typeof ItemType} ItemType
-   * @typedef {keyof typeof TrainingStatus} TrainingStatus
    */
 
   const configuration = Object.seal({
@@ -52,19 +50,6 @@
     },
   });
 
-  const ItemType = {
-    codestone: "codestone",
-    dubloon: "dubloon",
-    unknown: "unknown",
-  };
-
-  const TrainingStatus = {
-    noCourseStarted: "noCourseStarted",
-    active: "active",
-    finished: "finished",
-    needsPayment: "needsPayment",
-  };
-
   function main() {
     if (!CurrentPage.isStatusPage()) {
       return;
@@ -79,13 +64,13 @@
     allPets.forEach((pet) => {
       if (DEBUG) console.debug("Training info:", pet);
       switch (pet.status) {
-        case TrainingStatus.noCourseStarted:
+        case PetTrainingInfo.Status.noCourseStarted:
           return pet.addStartCourseForm();
-        case TrainingStatus.active:
+        case PetTrainingInfo.Status.active:
           return pet.startCountdownTracker();
-        case TrainingStatus.finished:
+        case PetTrainingInfo.Status.finished:
           return pet.addAjaxListenerToCompleteCourseForm();
-        case TrainingStatus.needsPayment:
+        case PetTrainingInfo.Status.needsPayment:
           return pet.updatePaymentUI();
       }
     });
@@ -147,6 +132,16 @@
 
   class PetTrainingInfo {
     /**
+     * @typedef {(typeof PetTrainingInfo.Status)[keyof typeof PetTrainingInfo.Status]} PetTrainingStatus
+     */
+    static Status = Object.freeze({
+      noCourseStarted: "noCourseStarted",
+      active: "active",
+      finished: "finished",
+      needsPayment: "needsPayment",
+    });
+
+    /**
      * @param {HTMLTableRowElement} headerRow
      */
     constructor(headerRow) {
@@ -163,17 +158,17 @@
       const bodyRow = headerRow.nextElementSibling;
 
       /**
-       * @type {TrainingStatus}
+       * @type {PetTrainingStatus}
        * @public
        * @readonly
        */
       this.status = headerRow.textContent.includes("is not on a course")
-        ? TrainingStatus.noCourseStarted
+        ? PetTrainingInfo.Status.noCourseStarted
         : bodyRow.textContent.includes("Time till course finishes")
-        ? TrainingStatus.active
+        ? PetTrainingInfo.Status.active
         : bodyRow.textContent.includes("Course Finished!")
-        ? TrainingStatus.finished
-        : TrainingStatus.needsPayment;
+        ? PetTrainingInfo.Status.finished
+        : PetTrainingInfo.Status.needsPayment;
 
       /**
        * @type {HTMLElement}
@@ -598,6 +593,15 @@
 
   class ItemInfo {
     /**
+     * @typedef {(typeof ItemInfo.ItemType)[keyof typeof ItemInfo.ItemType]} ItemType
+     */
+    static ItemType = Object.freeze({
+      codestone: "codestone",
+      dubloon: "dubloon",
+      unknown: "unknown",
+    });
+
+    /**
      * @param {HTMLElement} nameElement The element containing the item name
      */
     constructor(nameElement) {
@@ -621,10 +625,10 @@
        * @readonly
        */
       this.itemType = nameElement.textContent.includes("Dubloon")
-        ? ItemType.dubloon
+        ? ItemInfo.ItemType.dubloon
         : nameElement.textContent.includes("Codestone")
-        ? ItemType.codestone
-        : ItemType.unknown;
+        ? ItemInfo.ItemType.codestone
+        : ItemInfo.ItemType.unknown;
 
       let image =
         nameElement.nextSibling?.tagName === "IMG"
@@ -650,7 +654,7 @@
     }
 
     isDubloon() {
-      return this.itemType === ItemType.dubloon;
+      return this.itemType === ItemInfo.ItemType.dubloon;
     }
 
     updateItemUI() {
