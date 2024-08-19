@@ -1371,7 +1371,7 @@
         }
 
         .form-status-message.hiding {
-          animation: hide 0.3s;
+          animation: hide 0.3s forwards;
         }
 
         @keyframes show {
