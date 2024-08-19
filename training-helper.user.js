@@ -2,11 +2,11 @@
 // @name         Neopets Training Helper
 // @author       Hiddenist
 // @namespace    https://hiddenist.com
-// @version      2024-08-19-beta1
+// @version      2024-08-19-beta2
 // @description  Makes codestone training your pet require fewer clicks and less math.
-// @match        http*://www.neopets.com/island/fight_training.phtml*
-// @match        http*://www.neopets.com/island/training.phtml*
-// @match        http*://www.neopets.com/pirates/academy.phtml*
+// @match        https://www.neopets.com/island/fight_training.phtml*
+// @match        https://www.neopets.com/island/training.phtml*
+// @match        https://www.neopets.com/pirates/academy.phtml*
 // @grant        GM_getValue
 // @grant        GM_setValue
 // @grant        GM_deleteValue
@@ -16,6 +16,15 @@
 // ==/UserScript==
 (function () {
   ("use strict");
+
+  // if the user script is not installed with Greasemonkey or Tampermonkey, try to polyfill GM_* functions
+  const fallbackStorage = makeLocalStore("trainingHelper");
+  if (typeof GM_deleteValue === "undefined")
+    GM_deleteValue = fallbackStorage.removeItem.bind(fallbackStorage);
+  if (typeof GM_getValue === "undefined")
+    GM_getValue = fallbackStorage.getItem.bind(fallbackStorage);
+  if (typeof GM_setValue === "undefined")
+    GM_setValue = fallbackStorage.setItem.bind(fallbackStorage);
 
   const DEBUG = GM_getValue("debug", false);
   const DUBLOON_TRAINING_MAX_LEVEL = 40;
@@ -1676,6 +1685,21 @@
 
       return { days: ageValue, hours: 0 };
     }
+  }
+
+  function makeLocalStore(prefix) {
+    const getKey = (key) => `${prefix}.${key}`;
+    return Object.freeze({
+      getValue(key, defaultValue) {
+        return localStorage.getItem(getKey(key)) ?? defaultValue;
+      },
+      setValue(key, value) {
+        localStorage.setItem(getKey(key), value);
+      },
+      deleteValue(key) {
+        localStorage.removeItem(getKey(key));
+      },
+    });
   }
 
   main();
