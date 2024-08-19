@@ -83,6 +83,7 @@
 
     const allPets = PetTrainingInfo.getForAllPets();
 
+    // feature to add: if a pet is too high of a level for the school, and not on a course, we should remove them from the big list and instead show a message at the bottom of who can't go
     allPets.forEach((pet) => {
       if (DEBUG) console.debug("Training info:", pet);
       switch (pet.status) {
@@ -143,6 +144,12 @@
 
     static getScriptName() {
       return window.location.pathname.split("/").pop();
+    }
+
+    static getNavBar() {
+      return document
+        .querySelector('.content center a[href*="type=status"]')
+        ?.closest("center");
     }
   }
 
@@ -1241,6 +1248,18 @@
 
       const styles = document.createElement("style");
       styles.textContent = `
+        details {
+          margin: 16px;
+          padding: 16px;
+          border: 1px solid #ccc;
+          border-radius: 4px;
+        }
+
+        summary {
+          cursor: pointer;
+          color: #5C73A0;
+        }
+
         h2, h3 {
           margin: 0;
         }
@@ -1250,11 +1269,13 @@
           flex-direction: column;
           gap: 16px;
           width: fit-content;
-          margin: 16px;
+          margin: 0;
+          margin-top: 8px;
           text-align: left;
           padding: 16px;
           border: 1px solid #ccc;
           border-radius: 4px;
+          background: #fafafa;
         }
   
         label > input + span {
@@ -1287,73 +1308,85 @@
 
       shadow.append(styles);
 
-      shadow.append(
-        UI.createForm({
-          shadowRoot: true,
-          children: [
-            UI.createElement("h2", { textContent: "Training Helper" }),
-            UI.createElement("h3", { textContent: "Configuration" }),
-            UI.createInput({
-              label: "Enable Notifications",
-              name: "notificationsEnabled",
-              checked: configuration.notifications.enabled,
-              type: "checkbox",
-            }),
-            UI.createInput({
-              label: "Enable Idle Reminder",
-              name: "idleReminderEnabled",
-              checked: configuration.notifications.idleReminder.enabled,
-              type: "checkbox",
-            }),
-            UI.createInput({
-              label: "Idle Threshold (minutes)",
-              name: "idleThreshold",
-              value: Math.round(
-                configuration.notifications.idleReminder.thresholdInMs /
-                  (1000 * 60)
-              ),
-              type: "number",
-            }),
-            UI.createInput({
-              type: "submit",
-              value: "Save",
-              className: "save-button",
-            }),
-          ],
-          onSubmit: (e) => {
-            e.preventDefault();
-            configuration.notifications.enabled =
-              e.target.notificationsEnabled.checked;
-            GM_setValue(
-              "notifications.enabled",
-              configuration.notifications.enabled
-            );
+      const form = UI.createForm({
+        shadowRoot: true,
+        children: [
+          UI.createInput({
+            label: "Enable Notifications",
+            name: "notificationsEnabled",
+            checked: configuration.notifications.enabled,
+            type: "checkbox",
+          }),
+          UI.createInput({
+            label: "Enable Idle Reminder",
+            name: "idleReminderEnabled",
+            checked: configuration.notifications.idleReminder.enabled,
+            type: "checkbox",
+          }),
+          UI.createInput({
+            label: "Idle Threshold (minutes)",
+            name: "idleThreshold",
+            value: Math.round(
+              configuration.notifications.idleReminder.thresholdInMs /
+                (1000 * 60)
+            ),
+            type: "number",
+          }),
+          UI.createInput({
+            type: "submit",
+            value: "Save",
+            className: "save-button",
+          }),
+        ],
+        onSubmit: (e) => {
+          e.preventDefault();
+          configuration.notifications.enabled =
+            e.target.notificationsEnabled.checked;
+          GM_setValue(
+            "notifications.enabled",
+            configuration.notifications.enabled
+          );
 
-            if (configuration.notifications.enabled) {
-              Notifier.requestNotificationPermission();
-            }
+          if (configuration.notifications.enabled) {
+            Notifier.requestNotificationPermission();
+          }
 
-            configuration.notifications.idleReminder.enabled =
-              e.target.idleReminderEnabled.checked;
-            GM_setValue(
-              "notifications.idleReminder.enabled",
-              configuration.notifications.idleReminder.enabled
-            );
+          configuration.notifications.idleReminder.enabled =
+            e.target.idleReminderEnabled.checked;
+          GM_setValue(
+            "notifications.idleReminder.enabled",
+            configuration.notifications.idleReminder.enabled
+          );
 
-            configuration.notifications.idleReminder.thresholdInMs =
-              e.target.idleThreshold.value * 1000 * 60;
-            GM_setValue(
-              "notifications.idleReminder.thresholdInMs",
-              configuration.notifications.idleReminder.thresholdInMs
-            );
-          },
-        })
-      );
+          configuration.notifications.idleReminder.thresholdInMs =
+            e.target.idleThreshold.value * 1000 * 60;
+          GM_setValue(
+            "notifications.idleReminder.thresholdInMs",
+            configuration.notifications.idleReminder.thresholdInMs
+          );
+        },
+      });
 
-      const parent =
-        document.querySelector("#content td.content") ?? document.body;
+      const details = UI.createElement("details", {
+        children: [
+          UI.createElement("summary", {
+            textContent: "Training Helper Configuration",
+          }),
+          form,
+        ],
+      });
 
-      parent.append(container);
+      shadow.append(details);
+
+      const navBar = CurrentPage.getNavBar();
+      if (navBar) {
+        navBar.after(container);
+      } else {
+        const parent =
+          document.querySelector("#content td.content") ?? document.body;
+
+        parent.append(container);
+      }
     }
   }
 
