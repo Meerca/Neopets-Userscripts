@@ -1466,20 +1466,36 @@
                         body: "You will now receive notifications from the Training Helper.",
                       });
                     }
+                    
 
-                    statusMessage.show({
-                      message: target.checked
-                        ? "Notifications enabled"
-                        : "Notifications disabled",
-                      element: form,
-                      type: "success",
-                    });
+                    let wasSuccess = false;
+                    try {
+                      configuration.notifications.enabled = target.checked;
+                      GM_setValue(
+                        "notifications.enabled",
+                        configuration.notifications.enabled
+                      );
+                      wasSuccess = true;
+                    } catch (e) {
+                      console.error(e);
+                    }
 
-                    configuration.notifications.enabled = target.checked;
-                    GM_setValue(
-                      "notifications.enabled",
-                      configuration.notifications.enabled
-                    );
+                    if (wasSuccess) {
+                      statusMessage.show({
+                        message: target.checked
+                          ? "Notifications enabled"
+                          : "Notifications disabled",
+                        element: form,
+                        type: "success",
+                      });
+                    } else {
+                      statusMessage.show({
+                        message:
+                          "Oops, there was a problem saving your settings.",
+                        element: form,
+                        type: "error",
+                      });
+                    }
                   },
                 },
               }),
