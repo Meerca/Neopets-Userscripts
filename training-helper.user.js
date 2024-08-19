@@ -128,6 +128,14 @@
       return CurrentPage.getTrainingSchool() === CurrentPage.PirateSchool;
     }
 
+    static isRegularSchool() {
+      return CurrentPage.getTrainingSchool() === CurrentPage.RegularSchool;
+    }
+
+    static isSecretSchool() {
+      return CurrentPage.getTrainingSchool() === CurrentPage.SecretSchool;
+    }
+
     static isStatusPage() {
       const query = new URLSearchParams(window.location.search);
       return query.get("type") === "status";
@@ -336,7 +344,7 @@
 
     updatePaymentUI() {
       this.trainingCost.forEach((item) => {
-        item.addSearchForm();
+        item.updateItemUI();
       });
     }
 
@@ -595,6 +603,13 @@
      */
     constructor(nameElement) {
       /**
+       * @type {HTMLElement}
+       * @private
+       * @readonly
+       */
+      this.nameElement = nameElement;
+
+      /**
        * @type {string}
        * @public
        * @readonly
@@ -617,8 +632,14 @@
           ? nameElement.nextSibling
           : null;
 
-      if (!image && this.isDubloon()) {
-        image = nameElement.parentElement.querySelector("img");
+      /**
+       * @type {HTMLTableElement | null}
+       */
+      this.dubloonTable = null;
+
+      if (this.isDubloon()) {
+        this.dubloonTable = nameElement.closest("table");
+        image = this.dubloonTable?.querySelector("img");
       }
 
       /**
@@ -627,24 +648,52 @@
        * @readonly
        */
       this.image = image;
-
-      /**
-       * @type {HTMLElement}
-       * @private
-       * @readonly
-       */
-      this.element = nameElement;
     }
 
     isDubloon() {
       return this.itemType === ItemType.dubloon;
     }
 
-    addSearchForm() {
-      if (this.image && this.element.nextSibling === this.image) {
-        this.image.style = { marginBottom: "10px" };
+    updateItemUI() {
+      const searchForm = ItemInfo.createItemSearchForm(this.itemName);
+
+      if (this.isDubloon()) {
+        this.nameElement.after(ItemInfo.createItemSearchForm(this.itemName));
+        this.image.parentElement.append(this.nameElement);
+        this.image.parentElement.align = "center";
+        this.dubloonTable.className = "item-info-table";
+
+        return;
       }
-      this.element.append(ItemInfo.createItemSearchForm(this.itemName));
+
+      const newItemUI = UI.createElement("table", {
+        className: "item-info-table",
+        children: [
+          UI.createElement("tr", {
+            children: [
+              UI.createElement("td", {
+                align: "center",
+                children: [
+                  this.image,
+                  document.createElement("br"),
+                  UI.createElement("b", { textContent: this.itemName }),
+                ],
+              }),
+              UI.createElement("td", {
+                children: [searchForm],
+              }),
+            ],
+          }),
+        ],
+      });
+
+      this.nameElement.after(newItemUI);
+      const nextSib = this.nameElement.nextElementSibling;
+
+      if (nextSib.tagName === "BR") {
+        nextSib.remove();
+      }
+      this.nameElement.remove();
     }
 
     static searchShopWiz(searchTerm) {
@@ -770,7 +819,6 @@
     static checkFreebies(petInfo, trainingInfo) {
       const isPetsBirthday =
         QuickrefLookup.parsePetAgeIntoDays(petInfo.age) % 365 === 0;
-      debugger;
 
       if (isPetsBirthday) {
         Freebies.sendBirthdayNotification(petInfo.petName);
@@ -781,10 +829,7 @@
         Freebies.isPetSpeciesDay(petInfo.species) &&
         trainingInfo.currentStats.level < DUBLOON_TRAINING_MAX_LEVEL
       ) {
-        Freebies.sendPetDayNotification(
-          petInfo.petName,
-          petInfo.species
-        );
+        Freebies.sendPetDayNotification(petInfo.petName, petInfo.species);
         Freebies.addPetDayNotice(trainingInfo, petInfo.species);
       }
     }
@@ -990,6 +1035,42 @@
           border: 1px solid #ccc;
           border-radius: 4px;
         }
+
+        .item-info-table {
+          border-collapse: separate;
+          border-spacing: 0;
+          border: 1px solid #ccc;
+          width: 100%;
+          border-radius: 4px;
+        }
+
+        .item-info-table td {
+          padding: 8px;
+        }
+
+        .item-info-table td:last-child {
+          width: 90px;
+          background: #efefef;
+        }
+
+        .item-info-table button {
+          width: 100%;
+          padding: 8px;
+          border: 1px solid #ccc;
+          border-radius: 4px;
+          background: #fff;
+          cursor: pointer;
+          color: #5C73A0;
+          transition: background 0.2s;
+        }
+
+        .item-info-table button:hover {
+          background: #f0f0f0;
+        }
+
+        .item-info-table button:active {
+          background: #e0e0e0;
+        }
       `;
       document.head.append(style);
     }
@@ -1128,11 +1209,12 @@
           display: flex;
           flex-direction: column;
           gap: 16px;
-          max-width: 300px;
+          width: fit-content;
           margin: 16px;
           text-align: left;
           padding: 16px;
           border: 1px solid #ccc;
+          border-radius: 4px;
         }
   
         label > input + span {
@@ -1146,6 +1228,20 @@
   
         .save-button {
           margin-top: 16px;
+          padding: 8px;
+          background: #5C73A0;
+          color: white;
+          border: none;
+          border-radius: 4px;
+          transition: background 0.2s;
+        }
+
+        .save-button:hover {
+          background: #4A5F8C;
+        }
+
+        .save-button:active {
+          background: #3A4F7C;
         }
       `;
 
@@ -1326,8 +1422,6 @@
   }
 
   class QuickrefLookup {
-    isLoading = false;
-
     /**
      * @type {Document}
      * @private
@@ -1340,20 +1434,12 @@
     _domPromise = null;
 
     async load() {
-      const result = await this.waitUntilLoaded();
-      if (result) {
+      if (this._domPromise) {
+        await this._domPromise;
         return this;
       }
 
-      return await this.fetch();
-    }
-
-    async waitUntilLoaded() {
-      if (this.isLoading) {
-        return await this._domPromise;
-      }
-
-      return this._dom;
+      return this.fetch();
     }
 
     async fetch(clearCache = false) {
@@ -1361,15 +1447,9 @@
         this._dom = null;
       }
 
-      this.isLoading = true;
-
       this._domPromise = fetch("/quickref.phtml")
         .then((r) => r.text())
         .then((body) => new DOMParser().parseFromString(body, "text/html"));
-
-      this._domPromise.finally(() => {
-        this.isLoading = false;
-      });
 
       this._dom = await this._domPromise;
 
@@ -1382,6 +1462,7 @@
         return null;
       }
       const result = JSON.parse(GM_getValue(`petInfo.${petName}`, "null"));
+      if (DEBUG) console.debug("Got cached pet info for", petName, result);
       if (!result) return null;
       if (!result.expiresAt || Date.now() > result.expiresAt) {
         GM_deleteValue(`petInfo.${petName}`);
@@ -1393,18 +1474,16 @@
     setCachedPetInfo(petName, petInfo) {
       if (!configuration.quickrefLookup.shouldCache) return;
 
-      const midnightNst = new Date();
-      midnightNst.setUTCHours(
-        -1 * DateTimeHelpers.getNstTimezoneOffset(),
-        0,
-        0,
-        0
-      );
+      const midnightNstHour = -1 * DateTimeHelpers.getNstTimezoneOffset();
+      const midnightNstTomorrow = new Date();
+      midnightNstTomorrow.setUTCHours(midnightNstHour, 0, 0, 0);
+      midnightNstTomorrow.setUTCDate(midnightNstTomorrow.getUTCDate() + 1);
 
-      GM_setValue(
-        `petInfo.${petName}`,
-        JSON.stringify({ petInfo, expiresAt: midnightNst.getTime() })
-      );
+      const result = { petInfo, expiresAt: midnightNstTomorrow.getTime() };
+
+      GM_setValue(`petInfo.${petName}`, JSON.stringify(result));
+
+      if (DEBUG) console.debug("Saved cached pet info for", petName, result);
     }
 
     /**
