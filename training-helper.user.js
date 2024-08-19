@@ -2,7 +2,7 @@
 // @name         Neopets Training Helper
 // @author       Hiddenist
 // @namespace    https://hiddenist.com
-// @version      2024-08-19-beta2
+// @version      2024-08-19-beta3
 // @description  Makes codestone training your pet require fewer clicks and less math.
 // @match        https://www.neopets.com/island/fight_training.phtml*
 // @match        https://www.neopets.com/island/training.phtml*
@@ -1175,8 +1175,12 @@
       return form;
     }
 
-    static createInput({ label, ...elementProps }) {
+    static createInput({ label, checked, ...elementProps }) {
       const input = UI.createElement("input", elementProps);
+
+      if (checked) {
+        input.checked = true;
+      }
 
       if (!label) return input;
 
@@ -1195,7 +1199,9 @@
         labelProps.children.unshift(labelSpan, input);
       }
 
-      return UI.createElement("label", labelProps);
+      const labelElem = UI.createElement("label", labelProps);
+      labelElem.classList.add(`${elementProps.type ?? "text"}-label`);
+      return labelElem;
     }
 
     static createSelect({ value, options, ...elementProps }) {
@@ -1277,7 +1283,7 @@
           margin: 0;
         }
   
-        form {
+        .training-helper-configuration {
           position: relative;
           width: fit-content;
           margin: 0;
@@ -1287,7 +1293,7 @@
           background: #fafafa;
         }
 
-        form, fieldset {
+        .training-helper-configuration, fieldset {
           display: flex;
           flex-direction: column;
           gap: 16px;
@@ -1313,6 +1319,10 @@
           display: block;
           margin-top: 4px;
         }
+
+        .checkbox-label {
+          cursor: pointer;
+        }
   
         .save-button {
           padding: 8px;
@@ -1331,13 +1341,13 @@
           background: #3A4F7C;
         }
 
-        .success-message {
+        .form-status-message {
           padding: 8px;
-          background: #ebfaeb;
           border-radius: 4px;
+          background: #f0f0f0;
+          border: 1px solid #ccc;
+          color: #333;
           animation: show 0.3s;
-          color: #243115;
-          border: 1px solid #bad49e;
           box-sizing: border-box;
           overflow: hidden;
           position: absolute;
@@ -1348,58 +1358,61 @@
           box-shadow: 0 0 4px rgba(0, 0, 0, 0.1);
         }
 
-        .success-message.hiding {
+        .form-status-message.type-success {
+          background: #ebfaeb;
+          color: #243115;
+          border: 1px solid #bad49e;
+        }
+
+        .form-status-message.type-error {
+          background: #f9ebeb;
+          color: #4f2f2f;
+          border: 1px solid #d9a5a5;
+        }
+
+        .form-status-message.hiding {
           animation: hide 0.3s;
         }
 
         @keyframes show {
           from {
             opacity: 0;
-            max-height: 0;
-            line-height: 0;
+            transform: scaleY(0);
           }
           to {
             opacity: 1;
-            max-height: 32px;
-            line-height: 1;
+            transform: scaleY(1);
           }
         }
 
         @keyframes hide {
           from {
             opacity: 1;
-            max-height: 2em;
-            line-height: 1;
+            transform: scaleY(1);
           }
           to {
             opacity: 0;
-            max-height: 32px;
-            line-height: 0;
+            transform: scaleY(0);
           }
         }
       `;
 
       shadow.append(styles);
 
-      const saveButton = UI.createInput({
-        type: "submit",
-        value: "Save",
-        className: "save-button",
-      });
-
-      const successMessage = {
+      const statusMessage = {
         timeoutId: null,
         element: UI.createElement("div", {
-          textContent: "Save Successful!",
-          className: "success-message",
+          className: "form-status-message",
         }),
         _timeout(cb, ms) {
           if (this.timeoutId) clearTimeout(this.timeoutId);
           this.timeoutId = setTimeout(cb, ms);
         },
-        show(element, type = "append") {
-          element[type](this.element);
-          this.element.classList.remove("hiding");
+        show({ type, message, element, position = "append" }) {
+          this.element.textContent = message;
+          element[position](this.element);
+          this.element.classList.remove("type-success", "type-error", "hiding");
+          this.element.classList.add(`type-${type}`);
           this._timeout(() => this.startHideAnimation(), 3000);
         },
         startHideAnimation() {
@@ -1412,8 +1425,8 @@
         },
       };
 
-      const form = UI.createForm({
-        shadowRoot: true,
+      const form = UI.createElement("div", {
+        className: "training-helper-configuration",
         children: [
           UI.createElement("fieldset", {
             children: [
@@ -1422,32 +1435,57 @@
               }),
               UI.createInput({
                 label: "Enable Notifications",
-                name: "notificationsEnabled",
                 checked: configuration.notifications.enabled,
                 type: "checkbox",
+                listeners: {
+                  async change(e) {
+                    const target = e.target;
+                    if (target.checked) {
+                      const hasPermission =
+                        await Notifier.enableNotifications().catch(() => {
+                          statusMessage.show({
+                            message:
+                              "Oops, there was a problem enabling notifications.",
+                            element: form,
+                            type: "error",
+                          });
+                          return false;
+                        });
+
+                      if (!hasPermission) {
+                        statusMessage.show({
+                          message: "Notifications permission is disabled by your browser!",
+                          element: form,
+                          type: "error",
+                        });
+                        target.checked = false;
+                        return;
+                      }
+
+                      Notifier.sendNotification("Notifications enabled!", {
+                        body: "You will now receive notifications from the Training Helper.",
+                      });
+                    }
+
+                    statusMessage.show({
+                      message: target.checked
+                        ? "Notifications enabled"
+                        : "Notifications disabled",
+                      element: form,
+                      type: "success",
+                    });
+
+                    configuration.notifications.enabled = target.checked;
+                    GM_setValue(
+                      "notifications.enabled",
+                      configuration.notifications.enabled
+                    );
+                  },
+                },
               }),
             ],
           }),
-          saveButton,
         ],
-        onSubmit: (e) => {
-          e.preventDefault();
-
-          successMessage.hide();
-
-          configuration.notifications.enabled =
-            e.target.notificationsEnabled.checked;
-          GM_setValue(
-            "notifications.enabled",
-            configuration.notifications.enabled
-          );
-
-          if (configuration.notifications.enabled) {
-            Notifier.requestNotificationPermission();
-          }
-
-          successMessage.show(form);
-        },
       });
 
       const details = UI.createElement("details", {
@@ -1457,7 +1495,7 @@
             listeners: {
               click() {
                 if (!details.open) {
-                  successMessage.hide();
+                  statusMessage.hide();
                 }
               },
             },
@@ -1481,24 +1519,14 @@
   }
 
   class Notifier {
-    static requestNotificationPermission() {
-      if (Notification.permission === "granted") {
-        return;
+    static async enableNotifications() {
+      let permission = Notification.permission;
+
+      if (permission === "default") {
+        permission = await Notification.requestPermission();
       }
 
-      Notification.requestPermission().then((result) => {
-        if (result === "denied") {
-          console.warn("Notifications denied");
-          alert(
-            "Notifications are disbled by your browser settings, they can't be enabled here until you allow them for Neopets."
-          );
-          return;
-        }
-        if (result !== "granted") return;
-        Notifier.sendNotification("Notifications enabled!", {
-          body: "You will now receive notifications from the Training Helper.",
-        });
-      });
+      return permission === "granted";
     }
 
     static sendNotification(
