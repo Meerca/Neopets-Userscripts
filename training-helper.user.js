@@ -723,25 +723,23 @@
     }
 
     static createItemSearchForm(itemName) {
-      const buttonContainer = document.createElement("div");
-      buttonContainer.style.display = "grid";
-      buttonContainer.style.gap = "16px";
-      buttonContainer.style.margin = "16px auto";
-      buttonContainer.style.maxWidth = "150px";
-
-      const sdbButton = document.createElement("button");
-      sdbButton.textContent = "Search SDB";
-      sdbButton.addEventListener("click", () => ItemInfo.searchSdb(itemName));
-      buttonContainer.append(sdbButton);
-
-      const wizbutton = document.createElement("button");
-      wizbutton.textContent = "Shop Wiz";
-      wizbutton.addEventListener("click", () =>
-        ItemInfo.searchShopWiz(itemName)
-      );
-      buttonContainer.append(wizbutton);
-
-      return buttonContainer;
+      return UI.createElement("div", {
+        className: "item-search-form",
+        children: [
+          UI.createElement("button", {
+            textContent: "Search SDB",
+            listeners: {
+              click: () => ItemInfo.searchSdb(itemName),
+            },
+          }),
+          UI.createElement("button", {
+            textContent: "Shop Wiz",
+            listeners: {
+              click: () => ItemInfo.searchShopWiz(itemName),
+            },
+          }),
+        ],
+      });
     }
   }
 
@@ -1081,18 +1079,26 @@
           padding: 8px;
           border: 1px solid #ccc;
           border-radius: 4px;
-          background: #fff;
           cursor: pointer;
           color: #5C73A0;
+          background: #fff;
           transition: background 0.2s;
         }
 
         .item-info-table button:hover {
-          background: #f0f0f0;
+          background: #eff4fc;
+          box-shadow: 0 0 2px rgba(0, 0, 20, 0.1);
         }
 
         .item-info-table button:active {
-          background: #e0e0e0;
+          background: #d7dde8;
+          box-shadow: inset 0 0 2px rgba(0, 0, 20, 0.2);
+        }
+
+        .item-search-form {
+          display: flex;
+          gap: 8px;
+          flex-direction: column;
         }
       `;
       document.head.append(style);
@@ -1104,6 +1110,7 @@
      * @property {Array<Node> | Node | undefined} children
      * @property {string?} className
      * @property {string?} id
+     * @property {Record<string, function>} listeners
      *
      * @param {string} tagName
      * @param {ElementProps?} props
@@ -1111,7 +1118,13 @@
      */
     static createElement(
       tagName,
-      { children = [], textContent, className, ...attributes } = {}
+      {
+        children = [],
+        textContent,
+        className,
+        listeners = {},
+        ...attributes
+      } = {}
     ) {
       const element = document.createElement(tagName);
       for (const [key, value] of Object.entries(attributes)) {
@@ -1123,6 +1136,10 @@
       }
       if (textContent) {
         element.textContent = textContent;
+      }
+
+      for (const [event, listener] of Object.entries(listeners)) {
+        element.addEventListener(event, listener);
       }
 
       if (!Array.isArray(children) && children) {
