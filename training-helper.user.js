@@ -866,7 +866,7 @@
       }
 
       // test case: pet was born less than 1 day ago, but the has passed
-      const midnight = new Date(now);
+      const midnight = new Date();
       midnight.setHours(-1 * DateTimeHelpers.getNstTimezoneOffset(), 0, 0, 0);
 
       const petBirth = new Date();
