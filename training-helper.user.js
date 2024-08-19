@@ -815,12 +815,10 @@
     /**
      * @param {PetInfo} petInfo
      * @param {PetTrainingInfo} trainingInfo
+     * @returns {void}
      */
     static checkFreebies(petInfo, trainingInfo) {
-      const isPetsBirthday =
-        QuickrefLookup.parsePetAgeIntoDays(petInfo.age) % 365 === 0;
-
-      if (isPetsBirthday) {
+      if (Freebies.isPetsBirthday(petInfo)) {
         Freebies.sendBirthdayNotification(petInfo.petName);
         Freebies.addBirthdayNotice(trainingInfo);
       }
@@ -832,6 +830,31 @@
         Freebies.sendPetDayNotification(petInfo.petName, petInfo.species);
         Freebies.addPetDayNotice(trainingInfo, petInfo.species);
       }
+    }
+
+    /**
+     * @param {PetInfo} petInfo
+     * @returns {boolean}
+     */
+    static isPetsBirthday(petInfo) {
+      const age = QuickrefLookup.parsePetAge(petInfo.age);
+
+      if (!age) {
+        return false;
+      }
+
+      if (!age.hours) {
+        return age.days % 365 === 0;
+      }
+
+      // test case: pet was born less than 1 day ago, but the has passed
+      const midnight = new Date(now);
+      midnight.setHours(-1 * DateTimeHelpers.getNstTimezoneOffset(), 0, 0, 0);
+
+      const petBirth = new Date();
+      petBirth.setHours(petBirth.getHours() - age.hours);
+
+      return petBirth >= midnight;
     }
 
     /**
@@ -1539,18 +1562,18 @@
 
     /**
      * @param {string} age
-     * @returns {number?} The pet's age in days
+     * @returns {{ days?: number, hours?: number } | null} The pet's age in days
      */
-    static parsePetAgeIntoDays(age) {
+    static parsePetAge(age) {
       if (!age || typeof age !== "string") {
         if (DEBUG) console.warn("Invalid age", age);
-        return;
+        return null;
       }
 
       const ageMatch = age.match(/(?<value>[\d,]+) (?<unit>hours|days)/);
       if (!ageMatch) {
         if (DEBUG) console.warn("Invalid age format", age);
-        return;
+        return null;
       }
 
       const { value, unit } = ageMatch.groups;
@@ -1558,10 +1581,10 @@
       const ageValue = parseInt(value.replace(/,/g, ""));
 
       if (unit === "hours") {
-        return Math.floor(ageValue / 24);
+        return { days: Math.floor(ageValue / 24), hours: ageValue };
       }
 
-      return ageValue;
+      return { days: ageValue, hours: 0 };
     }
   }
 
