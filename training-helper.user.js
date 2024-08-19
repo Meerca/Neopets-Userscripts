@@ -17,7 +17,7 @@
 (function () {
   ("use strict");
 
-  const DEBUG = false;
+  const DEBUG = GM_getValue("debug", false);
   const DUBLOON_TRAINING_MAX_LEVEL = 40;
 
   /**
@@ -592,8 +592,6 @@
   class ItemInfo {
     /**
      * @param {HTMLElement} nameElement The element containing the item name
-     * @constructor
-     * @public
      */
     constructor(nameElement) {
       /**
@@ -619,7 +617,7 @@
           ? nameElement.nextSibling
           : null;
 
-      if (!image && itemType === ItemType.dubloon) {
+      if (!image && this.isDubloon()) {
         image = nameElement.parentElement.querySelector("img");
       }
 
@@ -638,8 +636,12 @@
       this.element = nameElement;
     }
 
+    isDubloon() {
+      return this.itemType === ItemType.dubloon;
+    }
+
     addSearchForm() {
-      if (this.element.nextSibling === this.image) {
+      if (this.image && this.element.nextSibling === this.image) {
         this.image.style = { marginBottom: "10px" };
       }
       this.element.append(ItemInfo.createItemSearchForm(this.itemName));
