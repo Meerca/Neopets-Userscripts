@@ -1257,6 +1257,7 @@
         }
   
         form {
+          position: relative;
           width: fit-content;
           margin: 0;
           margin-top: 8px;
@@ -1308,9 +1309,87 @@
         .save-button:active {
           background: #3A4F7C;
         }
+
+        .success-message {
+          padding: 8px;
+          background: #ebfaeb;
+          border-radius: 4px;
+          animation: show 0.3s;
+          color: #243115;
+          border: 1px solid #bad49e;
+          box-sizing: border-box;
+          overflow: hidden;
+          position: absolute;
+          top: 8px;
+          left: 8px;
+          width: calc(100% - 16px);
+          pointer-events: none;
+          box-shadow: 0 0 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .success-message.hiding {
+          animation: hide 0.3s;
+        }
+
+        @keyframes show {
+          from {
+            opacity: 0;
+            max-height: 0;
+            line-height: 0;
+          }
+          to {
+            opacity: 1;
+            max-height: 32px;
+            line-height: 1;
+          }
+        }
+
+        @keyframes hide {
+          from {
+            opacity: 1;
+            max-height: 2em;
+            line-height: 1;
+          }
+          to {
+            opacity: 0;
+            max-height: 32px;
+            line-height: 0;
+          }
+        }
       `;
 
       shadow.append(styles);
+
+      const saveButton = UI.createInput({
+        type: "submit",
+        value: "Save",
+        className: "save-button",
+      });
+
+      const successMessage = {
+        timeoutId: null,
+        element: UI.createElement("div", {
+          textContent: "Save Successful!",
+          className: "success-message",
+        }),
+        _timeout(cb, ms) {
+          if (this.timeoutId) clearTimeout(this.timeoutId);
+          this.timeoutId = setTimeout(cb, ms);
+        },
+        show(element, type = "append") {
+          element[type](this.element);
+          this.element.classList.remove("hiding");
+          this._timeout(() => this.startHideAnimation(), 3000);
+        },
+        startHideAnimation() {
+          this.element.classList.add("hiding");
+          this._timeout(() => this.hide(), 300);
+        },
+        hide() {
+          if (this.timeoutId) clearTimeout(this.timeoutId);
+          this.element.remove();
+        },
+      };
 
       const form = UI.createForm({
         shadowRoot: true,
@@ -1328,14 +1407,13 @@
               }),
             ],
           }),
-          UI.createInput({
-            type: "submit",
-            value: "Save",
-            className: "save-button",
-          }),
+          saveButton,
         ],
         onSubmit: (e) => {
           e.preventDefault();
+
+          successMessage.hide();
+
           configuration.notifications.enabled =
             e.target.notificationsEnabled.checked;
           GM_setValue(
@@ -1346,6 +1424,8 @@
           if (configuration.notifications.enabled) {
             Notifier.requestNotificationPermission();
           }
+
+          successMessage.show(form);
         },
       });
 
@@ -1353,6 +1433,13 @@
         children: [
           UI.createElement("summary", {
             textContent: "Training Helper Configuration",
+            listeners: {
+              click() {
+                if (!details.open) {
+                  successMessage.hide();
+                }
+              },
+            },
           }),
           form,
         ],
