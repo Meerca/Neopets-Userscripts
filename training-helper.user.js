@@ -2,25 +2,29 @@
 // @name         Neopets Training Helper
 // @author       Hiddenist
 // @namespace    https://hiddenist.com
-// @version      2024-08-18-alpha5
+// @version      2024-08-18-alpha6
 // @description  Makes codestone training your pet require fewer clicks and less math.
 // @match        http*://www.neopets.com/island/fight_training.phtml*
 // @match        http*://www.neopets.com/island/training.phtml*
 // @match        http*://www.neopets.com/pirates/academy.phtml*
 // @grant        GM_getValue
 // @grant        GM_setValue
+// @grant        GM_deleteValue
 // @updateURL    https://github.com/Meerca/Neopets-Userscripts/raw/main/training-helper.user.js
 // @downloadURL  https://github.com/Meerca/Neopets-Userscripts/raw/main/training-helper.user.js
 // @supportURL   https://github.com/Meerca/Neopets-Userscripts/issues
 // ==/UserScript==
 (function () {
   ("use strict");
-  const DEBUG = true;
+
+  const DEBUG = false;
+  const DUBLOON_TRAINING_MAX_LEVEL = 40;
 
   /**
    * @typedef {"strength" | "defence" | "agility" | "endurance" | "level"} StatName
    * @typedef {keyof typeof ItemType} ItemType
    * @typedef {keyof typeof TrainingStatus} TrainingStatus
+   * @typedef {keyof typeof TrainingSchools} TrainingSchool
    */
 
   const configuration = Object.seal({
@@ -35,7 +39,11 @@
       level: Infinity,
     },
     notifications: {
-      enabled: GM_getValue("notifications.enabled", false),
+      enabled:
+        GM_getValue(
+          "notifications.enabled",
+          Notification.permission === "granted"
+        ) && Notification.permission === "granted",
       idleReminder: {
         enabled: GM_getValue("notifications.idleReminder.enabled", false),
         intervalInMs: 1000 * 60,
@@ -44,6 +52,10 @@
           1000 * 60
         ),
       },
+    },
+    recommendFreeTraining: true,
+    quickrefLookup: {
+      shouldCache: true,
     },
   });
 
@@ -60,17 +72,25 @@
     needsPayment: "needsPayment",
   };
 
+  const TrainingSchool = {
+    regular: "regular",
+    pirate: "pirate",
+    secret: "secret",
+  };
+
   function main() {
     if (!isStatusPage()) {
       return;
     }
 
-    // feature idea: If the pet's level is < 40, check if it's the pet's birthday and recommend they go to the swashbuckling academy for free training.
-    // We can fetch all of the quickref data from this page: await fetch("/quickref.phtml").then(r => r.text())
+    addStyles();
 
-    getAllPetsTrainingInfo().forEach((trainingInfo) => {
+    const quickref = new QuickrefLookup();
+
+    const allPets = getAllPetsTrainingInfo();
+
+    allPets.forEach((trainingInfo) => {
       if (DEBUG) console.debug("Training info:", trainingInfo);
-
       switch (trainingInfo.status) {
         case TrainingStatus.noCourseStarted:
           return addStartCourseForm(trainingInfo);
@@ -83,7 +103,173 @@
       }
     });
 
+    if (configuration.recommendFreeTraining) {
+      allPets.forEach(async (trainingInfo) => {
+        const petInfo = await quickref.getPetInfo(trainingInfo.petName);
+        checkFreeTrainingRecommendation(petInfo, trainingInfo);
+      });
+    }
+
     addConfigurationForm();
+  }
+
+  /**
+   * @returns {TrainingSchool | null}
+   */
+  function getTrainingSchool() {
+    switch (window.location.pathname) {
+      case "/pirates/academy.phtml":
+        return TrainingSchool.pirate;
+      case "/island/training.phtml":
+        return TrainingSchool.regular;
+      case "/island/fight_training.phtml":
+        return TrainingSchool.secret;
+      default:
+        return null;
+    }
+  }
+
+  function addStyles() {
+    const style = document.createElement("style");
+    style.textContent = `
+      .training-helper-notice {
+        margin: 16px 0;
+        padding: 8px;
+        background: #f0f0f0;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+      }
+    `;
+    document.head.append(style);
+  }
+
+  class QuickrefLookup {
+    isLoading = false;
+
+    /**
+     * @type {Document}
+     * @private
+     */
+    _dom = null;
+    /**
+     * @type {Promise<Document> | null}
+     * @private
+     */
+    _domPromise = null;
+
+    async load() {
+      const result = await this.waitUntilLoaded();
+      if (result) {
+        return this;
+      }
+
+      return await this.fetch();
+    }
+
+    async waitUntilLoaded() {
+      if (this.isLoading) {
+        return await this._domPromise;
+      }
+
+      return this._dom;
+    }
+
+    async fetch(clearCache = false) {
+      if (clearCache) {
+        this._dom = null;
+      }
+
+      this.isLoading = true;
+
+      this._domPromise = fetch("/quickref.phtml")
+        .then((r) => r.text())
+        .then((body) => new DOMParser().parseFromString(body, "text/html"));
+
+      this._domPromise.finally(() => {
+        this.isLoading = false;
+      });
+
+      this._dom = await this._domPromise;
+
+      return this;
+    }
+
+    getCachedPetInfo(petName) {
+      if (!configuration.quickrefLookup.shouldCache) {
+        GM_deleteValue(`petInfo.${petName}`);
+        return null;
+      }
+      const result = JSON.parse(GM_getValue(`petInfo.${petName}`, "null"));
+      if (!result) return null;
+      if (!result.expiresAt || Date.now() > result.expiresAt) {
+        GM_deleteValue(`petInfo.${petName}`);
+        return null;
+      }
+      return result.petInfo;
+    }
+
+    setCachedPetInfo(petName, petInfo) {
+      if (!configuration.quickrefLookup.shouldCache) return;
+
+      const midnightNst = new Date();
+      midnightNst.setUTCHours(-1 * getNstTimezoneOffset(), 0, 0, 0);
+
+      GM_setValue(
+        `petInfo.${petName}`,
+        JSON.stringify({ petInfo, expiresAt: midnightNst.getTime() })
+      );
+    }
+
+    /**
+     * @typedef {Object} PetInfo
+     * @property {string} petName
+     * @property {string} species
+     * @property {string} level
+     * @property {string} strength
+     * @property {string} defence
+     * @property {string} move
+     * @property {string} intelligence
+     * @property {string} age
+     * @property {string} hunger
+     * @property {string} mood
+     *
+     * @param {string} petName
+     * @param {boolean} loadFreshData
+     * @returns {Promise<PetInfo>} The pet's info as it's listed on the quickref page.
+     */
+    async getPetInfo(petName, loadFreshData = false) {
+      const cachedInfo = this.getCachedPetInfo(petName);
+      if (!loadFreshData && cachedInfo) {
+        return cachedInfo;
+      }
+
+      if (loadFreshData) {
+        await this.fetch(true);
+      } else {
+        await this.load();
+      }
+
+      const petDetails = this._dom.querySelector(`#${petName}_details`);
+      const petStatsTable = petDetails.querySelector(".pet_stats");
+      const statRows = [...petStatsTable.querySelectorAll("tr")];
+
+      const petInfo = {
+        petName,
+      };
+
+      for (const row of statRows) {
+        const header = row.querySelector("th");
+        const data = row.querySelector("td");
+        if (!header || !data) continue;
+        const statName = header.textContent.replace(/:$/, "").toLowerCase();
+        const statValue = data.textContent;
+        petInfo[statName] = statValue;
+      }
+
+      this.setCachedPetInfo(petName, petInfo);
+
+      return petInfo;
+    }
   }
 
   function isStatusPage() {
@@ -102,12 +288,18 @@
       petName = undefined,
       previousNotification = null,
       idleCheckId = null,
+      shouldAddIdleCheck = true,
       previousTitle = document.title,
+      onClickNotification = null,
     }
   ) {
     document.title = title;
 
-    if (Notification.permission !== "granted") return;
+    if (
+      Notification.permission !== "granted" ||
+      !configuration.notifications.enabled
+    )
+      return;
 
     if (previousNotification) {
       previousNotification.close();
@@ -120,14 +312,16 @@
       body: body,
     });
 
-    if (!idleCheckId) {
+    if (!idleCheckId && shouldAddIdleCheck) {
       idleCheckId = setReturnFromIdleReminder(() => {
         sendNotification(title, {
           body,
           petName,
           previousNotification: notification,
           idleCheckId,
+          shouldAddIdleCheck,
           previousTitle,
+          onClickNotification,
         });
       });
     }
@@ -141,6 +335,7 @@
       if (idleCheckId) clearInterval(idleCheckId);
       notification.close();
       document.title = previousTitle;
+      onClickNotification?.();
     };
   }
 
@@ -322,52 +517,58 @@
    */
   function createElement(
     tagName,
-    { textContent, children = [], className, id } = {}
+    { children = [], textContent, className, ...attributes } = {}
   ) {
     const element = document.createElement(tagName);
-    if (textContent) element.textContent = textContent;
-    if (className) element.className = className;
-    if (id) element.id = id;
+    for (const [key, value] of Object.entries(attributes)) {
+      element.setAttribute(key, value);
+    }
+
+    if (className) {
+      element.className = className;
+    }
+    if (textContent) {
+      element.textContent = textContent;
+    }
 
     if (!Array.isArray(children) && children) {
       children = [children];
     }
-    children.forEach((child) => element.append(child));
+    children.forEach((child) => child && element.append(child));
     return element;
   }
 
-  function createForm({ action, method, onSubmit, ...elementProps }) {
+  function createForm({ onSubmit, ...elementProps }) {
     const form = createElement("form", elementProps);
-    if (action) form.action = action;
-    if (method) form.method = method;
     if (onSubmit) form.addEventListener("submit", onSubmit);
     return form;
   }
 
-  function createInput({ label, name, value, type, ...elementProps }) {
+  function createInput({ label, ...elementProps }) {
     const input = createElement("input", elementProps);
-    if (name) input.name = name;
-    if (value) input.value = value;
-    if (type) input.type = type;
 
     if (!label) return input;
 
-    const labelElement = document.createElement("label");
-    const labelText = document.createElement("span");
-    labelText.textContent = label;
-    labelElement.append(labelText);
+    const type = elementProps.type ?? "text";
+    const labelProps = typeof label === "object" ? label : {};
+    const labelString =
+      typeof label === "string" ? label : labelProps.textContent;
+
+    if (!labelProps.children) labelProps.children = [];
+
+    const labelSpan = createElement("span", { textContent: labelString });
 
     if (type === "checkbox" || type === "radio") {
-      labelElement.prepend(input);
+      labelProps.children.unshift(input, labelSpan);
     } else {
-      labelElement.append(input);
+      labelProps.children.unshift(labelSpan, input);
     }
-    return labelElement;
+
+    return createElement("label", labelProps);
   }
 
-  function createSelect({ name, value, options, ...elementProps }) {
+  function createSelect({ value, options, ...elementProps }) {
     const select = createElement("select", elementProps);
-    if (name) select.name = name;
 
     options.forEach((option) => {
       const optionElement = document.createElement("option");
@@ -661,7 +862,7 @@ A:hover{COLOR:#990000;}
    * @property {Date?} endTime
    * @property {Countdown[]} countdowns
    * @property {string} petName
-   * @property {StatName} stat
+   * @property {StatName?} currentCourseStat
    * @property {ItemInfo[]} trainingCost
    * @property {HTMLElement} trainingCell
    *
@@ -699,7 +900,7 @@ A:hover{COLOR:#990000;}
       trainingCell,
       currentStats,
       petName: titleRegexMatches.groups.petName,
-      stat: titleRegexMatches.groups.stat?.toLowerCase(),
+      currentCourseStat: titleRegexMatches.groups.stat?.toLowerCase(),
       countdowns,
       trainingCost: getTrainingCost(trainingCell),
       endTime: countdowns.find(({ isActualTime }) => isActualTime)?.endTime,
@@ -732,6 +933,267 @@ A:hover{COLOR:#990000;}
   }
 
   /**
+   * @param {PetInfo} petInfo
+   * @param {PetTrainingInfo} trainingInfo
+   */
+  function checkFreeTrainingRecommendation(petInfo, trainingInfo) {
+    const isPetsBirthday = parsePetAgeIntoDays(petInfo.age) % 365 === 0;
+    debugger;
+
+    if (isPetsBirthday) {
+      sendBirthdayNotification(petInfo.petName);
+      addBirthdayNotice(trainingInfo);
+    }
+
+    if (
+      isPetSpeciesDay(petInfo.species) &&
+      trainingInfo.currentStats.level < DUBLOON_TRAINING_MAX_LEVEL
+    ) {
+      sendPetDayNotification(petInfo.petName, petInfo.species);
+      addPetDayNotice(trainingInfo, petInfo.species);
+    }
+  }
+
+  function addBirthdayNotice(trainingInfo) {
+    const petName = trainingInfo.petName;
+    trainingInfo.trainingCell.append(
+      createElement("div", {
+        className: "training-helper-notice",
+        children: [
+          createElement("strong", {
+            textContent: `🎂 Happy Birthday ${petName}!!!`,
+          }),
+          createElement("p", {
+            children: [
+              "Don't forget to get your free birthday cupcake on ",
+              createElement("a", {
+                textContent: `${petName}'s lookup`,
+                href: `/petlookup.phtml?pet=${petName}`,
+              }),
+              " before the day ends."
+            ],
+          }),
+        ],
+      })
+    );
+  }
+
+  function addPetDayNotice(trainingInfo, species) {
+    trainingInfo.trainingCell.prepend(
+      createElement("div", {
+        className: "training-helper-notice",
+        children: [
+          createElement("strong", {
+            textContent: `Happy ${species} Day!`,
+          }),
+          getTrainingSchool() === TrainingSchool.pirate
+            ? createElement("p", {
+                textContent: "Your training is free here today!",
+              })
+            : createElement("p", {
+                children: [
+                  "Head over to the ",
+                  createElement("a", {
+                    textContent: "Swashbuckling Academy",
+                    href: "/pirates/academy.phtml?type=status",
+                  }),
+                  " for free training today!",
+                ],
+              }),
+        ],
+      })
+    );
+  }
+
+  function sendBirthdayNotification(petName) {
+    if (!configuration.notifications.enabled) return;
+
+    const gmKey = `birthdayRemindersSent.${petName}.${new Date().getUTCFullYear()}`;
+    if (GM_getValue(gmKey, false)) return;
+    GM_setValue(gmKey, true);
+
+    sendNotification(`🎂 Happy Birthday ${petName}!!!`, {
+      body: `Get your free birthday cupcake on ${petName}'s lookup before the day ends.`,
+      petName: petName,
+      onClickNotification() {
+        window.location = `/petlookup.phtml?pet=${petName}`;
+      },
+    });
+  }
+
+  function sendPetDayNotification(petName, species) {
+    if (!configuration.notifications.enabled) return;
+
+    const gmKey = `petDayNotificationSent.${species}.${new Date().getUTCFullYear()}`;
+    if (GM_getValue(gmKey, false)) return;
+    GM_setValue(gmKey, true);
+
+    sendNotification(`It's ${species} day!`, {
+      body: `Train for free in the Swashbuckling Academy today!`,
+      petName: petName,
+      onClickNotification() {
+        if (window.location.pathname !== "/pirates/academy.phtml") {
+          window.location = "/pirates/academy.phtml?type=status";
+        }
+      },
+    });
+  }
+
+  /**
+   * @param {string} age
+   * @returns
+   */
+  function parsePetAgeIntoDays(age) {
+    if (!age || typeof age !== "string") {
+      if (DEBUG) console.warn("Invalid age", age);
+      return;
+    }
+
+    const ageMatch = age.match(/(?<value>[\d,]+) (?<unit>hours|days)/);
+    if (!ageMatch) {
+      if (DEBUG) console.warn("Invalid age format", age);
+      return;
+    }
+
+    const { value, unit } = ageMatch.groups;
+
+    const ageValue = parseInt(value.replace(/,/g, ""));
+
+    if (unit === "hours") {
+      return Math.floor(ageValue / 24);
+    }
+
+    return ageValue;
+  }
+
+  /**
+   * @see https://www.neopets.com/calendar.phtml
+   *
+   * @param {string} species The species of the pet
+   * @returns Whether or not it's the pet's species day on Neopets
+   */
+  function isPetSpeciesDay(species) {
+    if (!species || typeof species !== "string") {
+      if (DEBUG) console.warn("Invalid species", species);
+      return;
+    }
+    const petDays = {
+      aisha: { month: 1, day: 3 },
+      gnorbu: { month: 1, day: 6 },
+      buzz: { month: 1, day: 11 },
+      elephante: { month: 1, day: 16 },
+      kacheek: { month: 1, day: 29 },
+      zafara: { month: 2, day: 3 },
+      lenny: { month: 2, day: 12 },
+      chia: { month: 2, day: 18 },
+      tonu: { month: 2, day: 21 },
+      mynci: { month: 2, day: 22 },
+      uni: { month: 3, day: 2 },
+      gelert: { month: 3, day: 6 },
+      scorchio: { month: 3, day: 14 },
+      chomby: { month: 3, day: 22 },
+      shoyru: { month: 4, day: 2 },
+      krawk: { month: 4, day: 16 },
+      lutari: { month: 4, day: 19 },
+      kougra: { month: 4, day: 22 },
+      cybunny: { month: 4, day: 27 },
+      lupe: { month: 5, day: 2 },
+      hissi: { month: 5, day: 4 },
+      moehog: { month: 5, day: 14 },
+      koi: { month: 5, day: 25 },
+      yurble: { month: 5, day: 28 },
+      jubJub: { month: 6, day: 6 },
+      quiggle: { month: 6, day: 13 },
+      nimmo: { month: 6, day: 15 },
+      kau: { month: 6, day: 19 },
+      acara: { month: 6, day: 28 },
+      flotsam: { month: 7, day: 3 },
+      ixi: { month: 7, day: 11 },
+      tuskanniny: { month: 7, day: 12 },
+      kiko: { month: 7, day: 17 },
+      peophin: { month: 7, day: 26 },
+      ruki: { month: 7, day: 29 },
+      blumaroo: { month: 8, day: 8 },
+      meerca: { month: 8, day: 18 },
+      grundo: { month: 8, day: 24 },
+      kyrii: { month: 8, day: 29 },
+      draik: { month: 9, day: 9 },
+      techo: { month: 9, day: 13 },
+      poogle: { month: 9, day: 19 },
+      skeith: { month: 9, day: 25 },
+      grarrl: { month: 10, day: 4 },
+      eyrie: { month: 10, day: 10 },
+      bori: { month: 10, day: 13 },
+      jetsam: { month: 10, day: 16 },
+      korbat: { month: 10, day: 26 },
+      pteri: { month: 11, day: 8 },
+      vandagyre: { month: 11, day: 12 },
+      // special mention: Neopets' official birthday is Nov 15th
+      usul: { month: 11, day: 27 },
+      xweetok: { month: 11, day: 29 },
+      bruce: { month: 12, day: 5 },
+      wocky: { month: 12, day: 12 },
+      ogrin: { month: 12, day: 28 },
+    };
+
+    const petDay = petDays[species.toLowerCase()];
+
+    if (!petDay) {
+      if (DEBUG) console.warn("No pet day found for", species);
+      return;
+    }
+
+    const nstDate = getNstDate();
+
+    return petDay.month === nstDate.month && petDay.day === nstDate.day;
+  }
+
+  function getNstTimezoneOffset() {
+    const nst = document
+      .querySelector("#nst, .nst")
+      ?.textContent.match(
+        /^(?<hour>\d+):(?<minute>\d+):(?<second>\d+) (?<amPm>am|pm) NST$/
+      )?.groups;
+
+    if (!nst) {
+      console.warn(
+        "No NST time found, setting NST timezone offset to -8 but this does not reflect daylight saving time."
+      );
+
+      return -8;
+    }
+
+    const nstHour = parseInt(nst.hour);
+    let nst24Hour = nstHour;
+
+    if (nst.amPm === "am" && nstHour === 12) {
+      nst24Hour = 0;
+    } else if (nst.amPm === "pm" && nstHour < 12) {
+      nst24Hour = nstHour + 12;
+    }
+
+    let utcHour = new Date().getUTCHours();
+
+    if (utcHour < nst24Hour) {
+      utcHour += 24;
+    }
+
+    const nstTimezoneOffset = nst24Hour - utcHour;
+
+    return nstTimezoneOffset;
+  }
+
+  function getNstDate() {
+    const now = new Date();
+
+    now.setHours(-1 * getNstTimezoneOffset());
+    const nstMonth = now.getUTCMonth() + 1;
+    const nstDay = now.getUTCDate();
+
+    return { month: nstMonth, day: nstDay };
+  }
+
+  /**
    * @param {DateTime} date
    * @returns {TimeLeft}
    */
@@ -760,7 +1222,12 @@ A:hover{COLOR:#990000;}
    * @param {PetTrainingInfo} trainingInfo
    */
   function handleTrainingComplete(trainingInfo) {
-    const { petName, stat, trainingCell, countdowns } = trainingInfo;
+    const {
+      petName,
+      currentCourseStat: stat,
+      trainingCell,
+      countdowns,
+    } = trainingInfo;
 
     sendNotification("Course Finished!", {
       body: petName + " has finished studying " + stat + ".",
@@ -855,13 +1322,13 @@ A:hover{COLOR:#990000;}
           createInput({
             label: "Enable Notifications",
             name: "notificationsEnabled",
-            value: configuration.notifications.enabled,
+            checked: configuration.notifications.enabled,
             type: "checkbox",
           }),
           createInput({
             label: "Enable Idle Reminder",
             name: "idleReminderEnabled",
-            value: configuration.notifications.idleReminder.enabled,
+            checked: configuration.notifications.idleReminder.enabled,
             type: "checkbox",
           }),
           createInput({
@@ -878,13 +1345,8 @@ A:hover{COLOR:#990000;}
             value: "Save",
             className: "save-button",
           }),
-
-          createElement("small", {
-            textContent: "Note: Right now this form doesn't save, sorry!",
-          }),
         ],
         onSubmit: (e) => {
-          if (DEBUG) console.debug("Form submitted", e);
           e.preventDefault();
           configuration.notifications.enabled =
             e.target.notificationsEnabled.checked;
@@ -892,6 +1354,10 @@ A:hover{COLOR:#990000;}
             "notifications.enabled",
             configuration.notifications.enabled
           );
+
+          if (configuration.notifications.enabled) {
+            requestNotificationPermission();
+          }
 
           configuration.notifications.idleReminder.enabled =
             e.target.idleReminderEnabled.checked;
@@ -906,10 +1372,6 @@ A:hover{COLOR:#990000;}
             "notifications.idleReminder.thresholdInMs",
             configuration.notifications.idleReminder.thresholdInMs
           );
-
-          if (configuration.notifications.idleReminder.enabled) {
-            requestNotificationPermission();
-          }
         },
       })
     );
@@ -926,12 +1388,17 @@ A:hover{COLOR:#990000;}
     }
 
     Notification.requestPermission().then((result) => {
-      if (result === "granted") {
-        sendNotification("Notifications enabled!", {
-          body: "You will now receive notifications from the Training Helper.",
-        });
-        button.remove();
+      if (result === "denied") {
+        console.warn("Notifications denied");
+        alert(
+          "Notifications are disbled by your browser settings, they can't be enabled here until you allow them for Neopets."
+        );
+        return;
       }
+      if (result !== "granted") return;
+      sendNotification("Notifications enabled!", {
+        body: "You will now receive notifications from the Training Helper.",
+      });
     });
   }
 
