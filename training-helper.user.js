@@ -2,7 +2,7 @@
 // @name         Neopets Training Helper
 // @author       Hiddenist
 // @namespace    https://hiddenist.com
-// @version      2024-08-19-beta3
+// @version      2024-08-20
 // @description  Makes codestone training your pet require fewer clicks and less math.
 // @match        https://www.neopets.com/island/fight_training.phtml*
 // @match        https://www.neopets.com/island/training.phtml*
@@ -831,11 +831,14 @@
 
   class Freebies {
     /**
-     * @param {PetInfo} petInfo
+     * @param {PetInfo | null} petInfo
      * @param {PetCourseInfo} trainingInfo
      * @returns {void}
      */
     static checkFreebies(petInfo, trainingInfo) {
+      if (!petInfo) {
+        return;
+      }
       if (Freebies.isPetsBirthday(petInfo)) {
         Freebies.sendBirthdayNotification(petInfo.petName);
         Freebies.addBirthdayNotice(trainingInfo);
@@ -1454,7 +1457,8 @@
 
                       if (!hasPermission) {
                         statusMessage.show({
-                          message: "Notifications permission is disabled by your browser!",
+                          message:
+                            "Notifications permission is disabled by your browser!",
                           element: form,
                           type: "error",
                         });
@@ -1466,7 +1470,6 @@
                         body: "You will now receive notifications from the Training Helper.",
                       });
                     }
-                    
 
                     let wasSuccess = false;
                     try {
@@ -1624,28 +1627,46 @@
 
     getCachedPetInfo(petName) {
       if (!configuration.quickrefLookup.shouldCache) {
-        GM_deleteValue(`petInfo.${petName}`);
+        // GM_deleteValue(`petInfo.${petName}`);
         return null;
       }
       const result = JSON.parse(GM_getValue(`petInfo.${petName}`, "null"));
       if (DEBUG) console.debug("Got cached pet info for", petName, result);
       if (!result) return null;
-      if (!result.expiresAt || Date.now() > result.expiresAt) {
-        GM_deleteValue(`petInfo.${petName}`);
+      if (!this.isCachedValueValid(result)) {
+        if (DEBUG)
+          console.debug("Cached value is invalid or expired for", petName);
+        // GM_deleteValue(`petInfo.${petName}`);
         return null;
       }
       return result.petInfo;
     }
 
+    /**
+     * @param {{ timestamp: number }}
+     * @returns {boolean}
+     * @private
+     */
+    isCachedValueValid(result) {
+      if (
+        typeof result !== "object" ||
+        !result ||
+        !("timestamp" in result) ||
+        !result.timestamp
+      ) {
+        return false;
+      }
+      const midnightNstHour = -1 * DateTimeHelpers.getNstTimezoneOffset();
+      const midnightNst = new Date();
+      midnightNst.setUTCHours(midnightNstHour, 0, 0, 0);
+
+      return result.timestamp > midnightNst;
+    }
+
     setCachedPetInfo(petName, petInfo) {
       if (!configuration.quickrefLookup.shouldCache) return;
 
-      const midnightNstHour = -1 * DateTimeHelpers.getNstTimezoneOffset();
-      const midnightNstTomorrow = new Date();
-      midnightNstTomorrow.setUTCHours(midnightNstHour, 0, 0, 0);
-      midnightNstTomorrow.setUTCDate(midnightNstTomorrow.getUTCDate() + 1);
-
-      const result = { petInfo, expiresAt: midnightNstTomorrow.getTime() };
+      const result = { petInfo, timestamp: Date.now() };
 
       GM_setValue(`petInfo.${petName}`, JSON.stringify(result));
 
@@ -1667,7 +1688,7 @@
      *
      * @param {string} petName
      * @param {boolean} loadFreshData
-     * @returns {Promise<PetInfo>} The pet's info as it's listed on the quickref page.
+     * @returns {Promise<PetInfo | null>} The pet's info as it's listed on the quickref page.
      */
     async getPetInfo(petName, loadFreshData = false) {
       const cachedInfo = this.getCachedPetInfo(petName);
@@ -1682,6 +1703,12 @@
       }
 
       const petDetails = this._dom.querySelector(`#${petName}_details`);
+
+      if (!petDetails) {
+        if (DEBUG) console.warn("No pet details found for", petName);
+        return null;
+      }
+
       const petStatsTable = petDetails.querySelector(".pet_stats");
       const statRows = [...petStatsTable.querySelectorAll("tr")];
 
