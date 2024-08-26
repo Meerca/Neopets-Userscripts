@@ -75,7 +75,86 @@
     quickrefLookup: {
       shouldCache: true,
     },
+    // Neopets is too broken in Japanese, Chinese, and Korean to support it so far
+    language: getLang(),
   });
+
+  const lang = {
+    neopets: {
+      badCharacters: "�",
+      universalStatNamePattern: {
+        strength:
+          /Strength|str|Kracht|kra|Força|Stärke|Frce|Force|Forza|Fuerza/i,
+        defence:
+          /Defence|def|Verdediging|Ver|Defesa|Verteidigung|Déf|Défense|Difesa|Defensa/i,
+        agility:
+          /Agility|mov|Beweeglijkheid|Bew|Agilidade|Movimento|Wendigkeit|Beweglichkeit|Mouv|Agilité|Agilità|Movimento|Movimiento|Agilidad/i,
+        endurance:
+          /Endurance|Hp|Uithoudingsvermogen|Resistência|Ausdauer|TP|Pf|Salute|Salud|Resistencia/i,
+        level: /Level|lvl|Nível|Saúde|Niv|Niveau|Livello|Nivel/i,
+      },
+      petHeaderStatusPattern: {
+        en: /^(?<petName>\w+).*(?:currently studying (?<stat>\w+)|(?<noCourse>not on a course))/,
+        nl: /^(?<petName>\w+).*(?:studeert op het moment  ?(?<stat>\S+)|(?<noCourse>niet in een les))/,
+        pt: /^(?<petName>\w+).*(?:está estudando (?<stat>\S+)|(?<noCourse>não está em um curso))/,
+        de: /^(?<petName>\w+).*(?:studiert momentan Folgendes: (?<stat>\S+)|(?<noCourse>nimmt nicht an einem Kurs teil))/,
+        fr: /^(?<petName>\w+).*(?:est en cours (?<stat>\S+)|(?<noCourse>n'est pas en cours))/,
+        it: /^(?<petName>\w+).*(?:ha iniziato un corso di  ?(?<stat>\S+)|(?<noCourse>non ha iniziato nessun corso))/,
+        es: /^(?<petName>\w+).*(?:está estudiando:  ?(?<stat>\S+)|(?<noCourse>no está en un curso))/,
+      },
+      timeTil: {
+        en: "Time till course finishes",
+        nl: "Tijd todat de les is afgelopen",
+        pt: "Tempo restante para o curso",
+        de: "Zeit bis zum Beenden des Kurses",
+        fr: "Temps restant avant la fin du cours",
+        it: "Tempo prima della fine del corso",
+        es: "Tiempo en el que termina el curso",
+      },
+      timePattern: {
+        en: /(?<hours>\d+) ?hrs, ?(?<minutes>\d+) ?minutes, ?(?<seconds>\d+) seconds/,
+        nl: /(?<hours>\d+) ?uren, ?(?<minutes>\d+) ?minuten, ?(?<seconds>\d+) seconden/,
+        pt: /(?<hours>\d+) ?horas, ?(?<minutes>\d+) ?minutos, ?(?<seconds>\d+) segundos/,
+        de: /(?<hours>\d+) ?Stunden, ??<minutes>(\d+) ?Minuten, ?(?<seconds>\d+) Sekunden/,
+        fr: /(?<hours>\d+) ?hrs, ?(?<minutes>\d+) ?minutes, ?(?<seconds>\d+)secondes/,
+        it: /(?<hours>\d+) ?ore, ?(?<minutes>\d+) ?minuti, ?(?<seconds>\d+) secondi/,
+        es: /(?<hours>\d+) ?hrs, ?(?<minutes>\d+) ?minutos, ?(?<seconds>\d+) segundos/,
+      },
+      courseFinished: {
+        en: "Course Finished!",
+      },
+      increasedStatPattern: {
+        en: /increased (?<statName>strength|defence|endurance|agility|level)/i,
+      },
+      codestone: {
+        en: "Codestone",
+        nl: "Codesteen",
+        pt: "Pedra M�stica", // literal value on Neopets, not a mistake in this script
+        de: "Codestein",
+        fr: "Codestone",
+        it: "Sassocodice",
+        es: "Piedra m�stica de",
+      },
+      dubloon: {
+        en: "Dubloon",
+        nl: "Dubloen",
+        pt: "Dobrão",
+        de: "Dublone",
+        fr: "Doublon",
+        it: "Doblone",
+        es: "Doblón",
+      },
+      notFoundInSdb: {
+        en: "Not finding any items with that criteria!",
+        nl: "Kan geen items met die criteria vinden!",
+        pt: "Não encontrando artigos com este critério!",
+        de: "Es sind keine Gegenstände mit diesen Suchkriterien zu finden!",
+        fr: "Aucun objet trouvé correspondant à ce critère!",
+        it: "Non siamo riusciti a trovare nessun oggetto con quei criteri di ricerca!",
+        es: "¡No encontramos ningún objeto con esas características!",
+      },
+    },
+  };
 
   function main() {
     if (!TrainingPage.isStatusPage()) {
@@ -183,7 +262,7 @@
      */
     constructor(headerRow) {
       const titleRegexMatches = headerRow.textContent.match(
-        /^(?<petName>\w+).*(?:currently studying (?<stat>\w+)|not on a course)/
+        lang.neopets.petHeaderStatusPattern[configuration.language]
       );
 
       if (!titleRegexMatches) {
@@ -199,11 +278,15 @@
        * @public
        * @readonly
        */
-      this.status = headerRow.textContent.includes("is not on a course")
+      this.status = titleRegexMatches.groups.noCourse
         ? PetCourseInfo.Status.noCourseStarted
-        : bodyRow.textContent.includes("Time till course finishes")
+        : bodyRow.textContent.includes(
+            lang.neopets.timeTil[configuration.language]
+          )
         ? PetCourseInfo.Status.active
-        : bodyRow.textContent.includes("Course Finished!")
+        : bodyRow.textContent.includes(
+            lang.neopets.courseFinished[configuration.language]
+          )
         ? PetCourseInfo.Status.finished
         : PetCourseInfo.Status.needsPayment;
 
@@ -261,11 +344,18 @@
      */
     static getForAllPets() {
       return [...document.querySelectorAll("td.content tr")]
-        .filter(
-          (tr) =>
-            tr.textContent.includes("is currently studying") ||
-            tr.textContent.includes("is not on a course")
-        )
+        .filter((tr) => {
+          const pattern =
+            lang.neopets.petHeaderStatusPattern[configuration.language];
+          if (DEBUG) {
+            console.debug("Checking pet header:", {
+              pattern,
+              text: tr.textContent,
+              result: pattern.test(tr.textContent),
+            });
+          }
+          return pattern.test(tr.textContent);
+        })
         .map((tr) => new PetCourseInfo(tr));
     }
 
@@ -293,8 +383,9 @@
         endurance: boldTags[4],
       };
 
-      const enduranceText = elements.endurance.textContent;
-      const enduranceMatch = enduranceText.match(
+      // broken in french because there's no bold tag lolol
+      const enduranceText = elements.endurance?.textContent;
+      const enduranceMatch = enduranceText?.match(
         /(?<currentHp>\d+) ?\/ ?(?<maxHp>\d+)/
       );
 
@@ -327,9 +418,9 @@
      */
     static getCountdowns(trainingCell) {
       return [...trainingCell.querySelectorAll("b")].flatMap((element) => {
-        const match = element.textContent.match(
-          /(?<hours>\d+) ?hrs, ?(?<minutes>\d+) ?minutes, ?(?<seconds>\d+) ?seconds/
-        );
+        const localizedMatch = lang.neopets.timePattern[configuration.language];
+        const match = element.textContent.match(localizedMatch);
+
         if (!match) return [];
 
         // Training fortune cookie original time before it's reduced
@@ -363,10 +454,22 @@
     static getTrainingCost(trainingCell) {
       const itemElements = [...trainingCell.querySelectorAll("b")].filter(
         (b) => {
-          return (
-            b.textContent.includes("Codestone") ||
-            b.textContent.includes("Dubloon")
+          const isCodestone = b.textContent.includes(
+            lang.neopets.codestone[configuration.language]
           );
+          const isDubloon = b.textContent.includes(
+            lang.neopets.dubloon[configuration.language]
+          );
+
+          if (DEBUG) {
+            console.debug("Item type check:", {
+              isCodestone,
+              isDubloon,
+              text: b.textContent,
+            });
+          }
+
+          return isCodestone || isDubloon;
         }
       );
 
@@ -435,7 +538,7 @@
         this.trainingCell.append(errorMessage);
         this.trainingCell.append(document.createElement("br"));
         this.trainingCell.append(
-          UI.createStartCourseForm(
+          UI.getStartCourseForm(
             this.petName,
             TrainingCalculator.recommendNextStatToTrain(this.currentStats)
           )
@@ -447,18 +550,25 @@
 
       paragraphs.forEach((p) => this.trainingCell.append(p));
 
-      const increasedStatName = this.updateDisplayedStatsAfterIncrease(
-        paragraphs.map((p) => p.textContent).join(" ")
-      );
+      let increasedStatName = undefined;
+
+      try {
+        // this won't work in other languages, but it's not critical
+        increasedStatName = this.updateDisplayedStatsAfterIncrease(
+          paragraphs.map((p) => p.textContent).join(" ")
+        );
+      } catch (e) {
+        if (DEBUG) console.debug("Stat auto-increment didn't work", e);
+        // reload the window to display updated stats
+        window.location.reload();
+      }
 
       const nextStat = TrainingCalculator.recommendNextStatToTrain(
         this.currentStats,
         increasedStatName
       );
 
-      this.trainingCell.append(
-        UI.createStartCourseForm(this.petName, nextStat)
-      );
+      this.trainingCell.append(UI.getStartCourseForm(this.petName, nextStat));
     }
 
     /**
@@ -479,9 +589,7 @@
        * @type {StatName?}
        */
       var increasedStat = increasedStatsMessage
-        .match(
-          /increased (?<statName>strength|defence|endurance|agility|level)/i
-        )
+        .match(lang.neopets.increasedStatPattern[configuration.language])
         ?.groups.statName?.toLowerCase();
 
       if (DEBUG)
@@ -524,7 +632,7 @@
 
     addStartCourseForm() {
       this.trainingCell.append(
-        UI.createStartCourseForm(
+        UI.getStartCourseForm(
           this.petName,
           TrainingCalculator.recommendNextStatToTrain(this.currentStats)
         )
@@ -661,9 +769,13 @@
        * @public
        * @readonly
        */
-      this.itemType = nameElement.textContent.includes("Dubloon")
+      this.itemType = nameElement.textContent.includes(
+        lang.neopets.dubloon[configuration.language]
+      )
         ? ItemInfo.ItemType.dubloon
-        : nameElement.textContent.includes("Codestone")
+        : nameElement.textContent.includes(
+            lang.neopets.codestone[configuration.language]
+          )
         ? ItemInfo.ItemType.codestone
         : ItemInfo.ItemType.unknown;
 
@@ -756,26 +868,31 @@
       );
     }
 
-    static searchSdb(searchTerm) {
+    static async searchSdb(searchTerm) {
       window.open(
         `/safetydeposit.phtml?obj_name=${encodeURIComponent(searchTerm)}`
       );
     }
 
     static createItemSearchForm(itemName) {
+      // if the bad character is in the name, get everything after it:
+      const searchName = itemName.includes(lang.neopets.badCharacters)
+        ? itemName.split(lang.neopets.badCharacters).pop()
+        : itemName;
+
       return UI.createElement("div", {
         className: "item-search-form",
         children: [
           UI.createElement("button", {
             textContent: "Search SDB",
             listeners: {
-              click: () => ItemInfo.searchSdb(itemName),
+              click: () => ItemInfo.searchSdb(searchName),
             },
           }),
           UI.createElement("button", {
             textContent: "Shop Wiz",
             listeners: {
-              click: () => ItemInfo.searchShopWiz(itemName),
+              click: () => ItemInfo.searchShopWiz(searchName),
             },
           }),
         ],
@@ -807,7 +924,7 @@
       const nst = document
         .querySelector("#nst, .nst")
         ?.textContent.match(
-          /^(?<hour>\d+):(?<minute>\d+):(?<second>\d+) (?<amPm>am|pm) NST$/
+          /^(?<hour>\d+):(?<minute>\d+):(?<second>\d+) (?<amPm>am|pm)?\s*(?:NST|NSZ|HSN)$/
         )?.groups;
 
       if (!nst) {
@@ -1266,7 +1383,7 @@
      * @param {StatName} selectedStat
      * @returns {HTMLFormElement}
      */
-    static createStartCourseForm(petName, selectedStat) {
+    static getStartCourseForm(petName, selectedStat) {
       return UI.createForm({
         action: "process_" + TrainingPage.getScriptName(),
         method: "post",
@@ -1671,12 +1788,12 @@
         return null;
       }
       const result = store.getValue(`petInfo.${petName}`, null);
-      if (DEBUG) console.debug("Got cached pet info for", petName, result);
+      // if (DEBUG) console.debug("Got cached pet info for", petName, result);
       if (!result) return null;
       if (!this.isCachedValueValid(result)) {
         if (DEBUG)
           console.debug("Cached value is invalid or expired for", petName);
-        // store.deleteValue(`petInfo.${petName}`);
+        store.deleteValue(`petInfo.${petName}`);
         return null;
       }
       return result.petInfo;
@@ -1711,7 +1828,7 @@
 
       store.setValue(`petInfo.${petName}`, result);
 
-      if (DEBUG) console.debug("Saved cached pet info for", petName, result);
+      // if (DEBUG) console.debug("Saved cached pet info for", petName, result);
     }
 
     /**
@@ -1851,6 +1968,10 @@
         localStorage.removeItem(getKey(key));
       },
     });
+  }
+
+  function getLang(dom = document) {
+    return dom.querySelector("select[name='lang']")?.value || "en";
   }
 
   main();
