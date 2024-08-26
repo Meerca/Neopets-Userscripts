@@ -1699,8 +1699,9 @@
       const midnightNstHour = -1 * DateTimeHelpers.getNstTimezoneOffset();
       const midnightNst = new Date();
       midnightNst.setUTCHours(midnightNstHour, 0, 0, 0);
+      midnightNst.setUTCDate(midnightNst.getUTCDate() - 1);
 
-      return result.timestamp > midnightNst;
+      return result.timestamp > midnightNst.getTime();
     }
 
     setCachedPetInfo(petName, petInfo) {
