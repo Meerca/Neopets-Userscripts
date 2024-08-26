@@ -44,12 +44,30 @@
       endurance: Infinity,
       level: Infinity,
     },
+    /** @private */
+    _isConfigPanelOpen: store.getValue("isConfigPanelOpen", false),
+    get isConfigPanelOpen() {
+      return this._isConfigPanelOpen;
+    },
+    set isConfigPanelOpen(value) {
+      this._isConfigPanelOpen = value;
+      store.setValue("isConfigPanelOpen", value);
+    },
     notifications: {
-      enabled:
+      /** @private */
+      _enabled:
         store.getValue(
           "notifications.enabled",
           Notification.permission === "granted"
         ) && Notification.permission === "granted",
+
+      get enabled() {
+        return this._enabled;
+      },
+      set enabled(value) {
+        this.enabled = value && Notification.permission === "granted";
+        store.setValue("notifications.enabled", value);
+      },
     },
     freebies: {
       enabled: true,
@@ -1284,6 +1302,7 @@
 
         p.version {
           font-size: 0.8em;
+          margin-top: 16px;
           margin-bottom: 0;
           text-align: right;
         }
@@ -1485,10 +1504,6 @@
                     let wasSuccess = false;
                     try {
                       configuration.notifications.enabled = target.checked;
-                      store.setValue(
-                        "notifications.enabled",
-                        configuration.notifications.enabled
-                      );
                       wasSuccess = true;
                     } catch (e) {
                       console.error(e);
@@ -1533,10 +1548,19 @@
           form,
           UI.createElement("p", {
             className: "version",
-            textContent: `Version ${VERSION}`
+            textContent: `Version ${getVersion()}`,
           }),
         ],
+        listeners: {
+          toggle() {
+            configuration.isConfigPanelOpen = details.open;
+          },
+        },
       });
+
+      if (configuration.isConfigPanelOpen) {
+        details.open = true;
+      }
 
       shadow.append(details);
 
