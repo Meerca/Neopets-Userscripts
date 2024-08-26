@@ -17,11 +17,18 @@
 (function () {
   ("use strict");
 
+  function getVersion() {
+    if (typeof GM_info === "undefined") {
+      return "2024-08-25";
+    }
+
+    return GM_info.script.version;
+  }
+
   const store = makeStore("hiddenist.trainingHelper");
 
   const DEBUG = store.getValue("debug", false);
   const DUBLOON_TRAINING_MAX_LEVEL = 40;
-  const VERSION = (typeof GM_info !== "undefined" && GM_info.script?.version) || "2024-08-25";
 
   /**
    * @typedef {"strength" | "defence" | "agility" | "endurance" | "level"} StatName
@@ -38,7 +45,8 @@
       level: Infinity,
     },
     notifications: {
-      enabled: store.getValue(
+      enabled:
+        store.getValue(
           "notifications.enabled",
           Notification.permission === "granted"
         ) && Notification.permission === "granted",
@@ -55,6 +63,8 @@
     if (!TrainingPage.isStatusPage()) {
       return;
     }
+
+    store.setValue("version", getVersion());
 
     UI.addStyles();
     UI.addConfigurationForm();
