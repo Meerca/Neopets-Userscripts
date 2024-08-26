@@ -2,7 +2,7 @@
 // @name         Neopets Training Helper
 // @author       Hiddenist
 // @namespace    https://hiddenist.com
-// @version      2024-08-20
+// @version      2024-08-25
 // @description  Makes codestone training your pet require fewer clicks and less math.
 // @match        https://www.neopets.com/island/fight_training.phtml*
 // @match        https://www.neopets.com/island/training.phtml*
@@ -17,23 +17,16 @@
 (function () {
   ("use strict");
 
-  // if the user script is not installed with Greasemonkey or Tampermonkey, try to polyfill GM_* functions
-  const fallbackStorage = makeLocalStore("trainingHelper");
-  if (typeof GM_deleteValue === "undefined")
-    GM_deleteValue = fallbackStorage.removeItem.bind(fallbackStorage);
-  if (typeof GM_getValue === "undefined")
-    GM_getValue = fallbackStorage.getItem.bind(fallbackStorage);
-  if (typeof GM_setValue === "undefined")
-    GM_setValue = fallbackStorage.setItem.bind(fallbackStorage);
+  const store = makeStore("hiddenist.trainingHelper");
 
-  const DEBUG = GM_getValue("debug", false);
+  const DEBUG = store.getValue("debug", false);
   const DUBLOON_TRAINING_MAX_LEVEL = 40;
+  const VERSION = (typeof GM_info !== "undefined" && GM_info.script?.version) || "2024-08-25";
 
   /**
    * @typedef {"strength" | "defence" | "agility" | "endurance" | "level"} StatName
    */
-
-  const configuration = Object.seal({
+  const configuration = Object.freeze({
     /**
      * The maximum level to train each stat to.
      */
@@ -45,8 +38,7 @@
       level: Infinity,
     },
     notifications: {
-      enabled:
-        GM_getValue(
+      enabled: store.getValue(
           "notifications.enabled",
           Notification.permission === "granted"
         ) && Notification.permission === "granted",
@@ -1031,8 +1023,8 @@
       if (!configuration.notifications.enabled) return;
 
       const gmKey = `birthdayRemindersSent.${petName}.${new Date().getUTCFullYear()}`;
-      if (GM_getValue(gmKey, false)) return;
-      GM_setValue(gmKey, true);
+      if (store.getValue(gmKey, false)) return;
+      store.setValue(gmKey, true);
 
       Notifier.sendNotification(`🎂 Happy Birthday ${petName}!!!`, {
         body: `Get your free birthday cupcake on ${petName}'s lookup before the day ends.`,
@@ -1053,8 +1045,8 @@
       if (!configuration.notifications.enabled) return;
 
       const gmKey = `petDayNotificationSent.${species}.${new Date().getUTCFullYear()}`;
-      if (GM_getValue(gmKey, false)) return;
-      GM_setValue(gmKey, true);
+      if (store.getValue(gmKey, false)) return;
+      store.setValue(gmKey, true);
 
       Notifier.sendNotification(`It's ${species} day!`, {
         body: `Train for free in the Swashbuckling Academy today!`,
@@ -1275,6 +1267,15 @@
           padding: 16px;
           border: 1px solid #ccc;
           border-radius: 4px;
+          display: flex;
+          gap: 8px;
+          flex-direction: column;
+        }
+
+        p.version {
+          font-size: 0.8em;
+          margin-bottom: 0;
+          text-align: right;
         }
 
         summary {
@@ -1474,7 +1475,7 @@
                     let wasSuccess = false;
                     try {
                       configuration.notifications.enabled = target.checked;
-                      GM_setValue(
+                      store.setValue(
                         "notifications.enabled",
                         configuration.notifications.enabled
                       );
@@ -1520,6 +1521,10 @@
             },
           }),
           form,
+          UI.createElement("p", {
+            className: "version",
+            textContent: `Version ${VERSION}`
+          }),
         ],
       });
 
@@ -1579,10 +1584,10 @@
 
       // the page does not reopen when clicking the notification if the browser tab was closed
       // We can listen on the homepage of neopets and check something like this to reopen the page if we want
-      // GM_setValue("notificationUrl", window.location.href);
+      // store.setValue("notificationUrl", window.location.href);
 
       notification.onclick = () => {
-        // GM_deleteValue("notificationUrl");
+        // store.deleteValue("notificationUrl");
         notification.close();
         document.title = previousTitle;
         onClickNotification?.();
@@ -1627,16 +1632,17 @@
 
     getCachedPetInfo(petName) {
       if (!configuration.quickrefLookup.shouldCache) {
-        // GM_deleteValue(`petInfo.${petName}`);
+        // not going to delete existing cache right here, but we should probably include a way to clear it within the settings menu
+        // store.deleteValue(`petInfo.${petName}`);
         return null;
       }
-      const result = JSON.parse(GM_getValue(`petInfo.${petName}`, "null"));
+      const result = store.getValue(`petInfo.${petName}`, null);
       if (DEBUG) console.debug("Got cached pet info for", petName, result);
       if (!result) return null;
       if (!this.isCachedValueValid(result)) {
         if (DEBUG)
           console.debug("Cached value is invalid or expired for", petName);
-        // GM_deleteValue(`petInfo.${petName}`);
+        // store.deleteValue(`petInfo.${petName}`);
         return null;
       }
       return result.petInfo;
@@ -1668,7 +1674,7 @@
 
       const result = { petInfo, timestamp: Date.now() };
 
-      GM_setValue(`petInfo.${petName}`, JSON.stringify(result));
+      store.setValue(`petInfo.${petName}`, result);
 
       if (DEBUG) console.debug("Saved cached pet info for", petName, result);
     }
@@ -1758,14 +1764,53 @@
     }
   }
 
-  function makeLocalStore(prefix) {
+  /**
+   * @typedef {Object} Storage
+   * @property {function(string, string): string} getValue
+   * @property {function(string, string): void} setValue
+   * @property {function(string): void} deleteValue
+   *
+   * @returns {Storage}
+   */
+  function makeStore(localFallbackPrefix) {
+    if (
+      typeof GM_setValue === "function" &&
+      typeof GM_getValue === "function"
+    ) {
+      return Object.freeze({
+        getValue(key, defaultValue) {
+          const value = GM_getValue(key, JSON.stringify(defaultValue));
+
+          if (typeof value !== "string") {
+            return value;
+          }
+
+          try {
+            return JSON.parse(value);
+          } catch (e) {
+            console.error("Error parsing value", value);
+            return defaultValue;
+          }
+        },
+        setValue(key, value) {
+          GM_setValue(key, JSON.stringify(value));
+        },
+        deleteValue(key) {
+          GM_deleteValue(key);
+        },
+      });
+    }
+    const prefix = localFallbackPrefix;
     const getKey = (key) => `${prefix}.${key}`;
+
     return Object.freeze({
       getValue(key, defaultValue) {
-        return localStorage.getItem(getKey(key)) ?? defaultValue;
+        return JSON.parse(
+          localStorage.getItem(getKey(key)) ?? JSON.stringify(defaultValue)
+        );
       },
       setValue(key, value) {
-        localStorage.setItem(getKey(key), value);
+        localStorage.setItem(getKey(key), JSON.stringify(value));
       },
       deleteValue(key) {
         localStorage.removeItem(getKey(key));
