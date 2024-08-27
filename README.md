@@ -74,7 +74,7 @@ Gathers data from your inventory page, so that when you visit the quick stock pa
 
 ### Training Helper
 
-Makes codestone training your pet require fewer clicks and less math. Will send browser notifications training is complete.
+Makes codestone training your pet require fewer clicks and less math. Will send browser notifications when training is complete.
 
 [![Install the Training Helper](https://img.shields.io/static/v1?label=&message=Install+Training+Helper&color=bbe026&style=for-the-badge)](https://github.com/Meerca/Neopets-Userscripts/raw/main/training-helper.user.js)
 <sup>(requires [Tampermonkey](https://chrome.google.com/webstore/detail/tampermonkey/dhdgffkkebhmkfjojejmpbldmpobfkfo))</sup>
@@ -99,5 +99,5 @@ Makes codestone training your pet require fewer clicks and less math. Will send 
 * Functions with or without Neopets Premium
 * Functions with or without a Training Fortune Cookie active
 
-[^1]: Currently, the user interface items are not translated and display in English.
+[^1]: Currently, the user interface items are not translated and display in English. Not all features are fully tested in all languages.
 [^2]: Does not support Chinese, Japanese, or Korean scripts, as the item names in Neopets are broken. In German and French, the countdown ticker does not function correctly right now.
