@@ -6,7 +6,7 @@ This is a set of user scripts to help improve the Neopets user experience.
 - [Bargain Stocks Helper](#bargain-stocks-helper): Helps you find stocks to purchase for the day
 - [Stock Purchase Helper](#stock-purchase-helper): Helps you make sure you're purchasing the right stocks at the right price
 - [Fancy Quickstock](#fancy-quickstock): Adds item images and info the the Quickstock page
-- [Training Helper](#training-helper): Helps you track when your pet will be done with codestone or dubloon training
+- [Training Helper](#training-helper): Helps find items and notify you when your pet completes a training course
 
 ## How to Install
 
