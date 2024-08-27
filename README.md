@@ -71,7 +71,6 @@ Gathers data from your inventory page, so that when you visit the quick stock pa
 
 <img style="width: 400px; max-width: 100%" alt="Screenshot of the Neopets Quickstock table with the Fancy Quickstock script running" src="screenshots/quickstock.png" />
 
----
 
 ### Training Helper
 
@@ -80,4 +79,25 @@ Makes codestone training your pet require fewer clicks and less math. Will send 
 [![Install the Training Helper](https://img.shields.io/static/v1?label=&message=Install+Training+Helper&color=bbe026&style=for-the-badge)](https://github.com/Meerca/Neopets-Userscripts/raw/main/training-helper.user.js)
 <sup>(requires [Tampermonkey](https://chrome.google.com/webstore/detail/tampermonkey/dhdgffkkebhmkfjojejmpbldmpobfkfo))</sup>
 
-> Disclaimer: This script has not been tested in quite a number of years!
+#### Screenshots
+
+<table><tr><td><img src="https://github.com/user-attachments/assets/31e7d2d1-9922-443c-bf07-3893322aa17c" /></td>
+<td><img src="https://github.com/user-attachments/assets/ada7daee-7525-4cc6-9402-a83a1efc8d23" /></td></tr>
+<tr><td><img src="https://github.com/user-attachments/assets/8f31c072-6f23-4f64-ad0a-89466f360d8d"></td><td><img src="https://github.com/user-attachments/assets/9097a207-19d6-42f3-a7d2-c3d5887013f8"></td></tr></table>
+
+
+#### Features
+* Partial[^1] multi-language[^2] support (based on current language on Neopets)
+* Allows you to start a training course from the status page in each of the three training schools
+* Lets you search the shop wiz (SSW if you have premium) or your SDB for codestones and dubloons with a single click  
+* Automatically recommends the next stat you should train (note: does not currently recommend optimized hitpoint levelling to minimize codestone use, instead it recommends your lowest stat and level only when necessary)
+* Shows a live countdown of how much time you have left in your course
+* Allows you to opt in to notifications when your pet's training is complete (note: the notification requires that you keep the browser tab open, there is no way to schedule a notification outside of the script)
+* Shows your training results directly on the page when you complete a course
+* Notifies you when it's your pet's birthday, to remind you to get your birthday muffin from their lookup
+* Notifies you if your pet is eligible for free training in the Swashbuckling Academy during the pet's official species day
+* Functions with or without Neopets Premium
+* Functions with or without a Training Fortune Cookie active
+
+[^1]: Currently, the user interface items are not translated and display in English.
+[^2]: Does not support Chinese, Japanese, or Korean scripts, as the item names in Neopets are broken. In German and French, the countdown ticker does not function correctly right now.
