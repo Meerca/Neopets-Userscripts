@@ -28,7 +28,7 @@ function makeChecklist() {
   const shadow = shadowRoot.attachShadow({ mode: "open" });
 
   const container = document.createElement("div");
-  container.classList.add("container");
+  container.classList.add("hiddenist-dailies-container");
 
   shadow.append(container);
 
@@ -66,7 +66,7 @@ function makeChecklist() {
       user-select: none;
     }
 
-    div.container {
+    div.hiddenist-dailies-container {
       background-color: #f8f8f8;
       padding: 1em;
       position: fixed;
@@ -75,12 +75,30 @@ function makeChecklist() {
       text-align: left;
       z-index: 999999999;
       box-shadow: 0 2px 3px rgba(0, 0, 0, 0.3);
+      font-family: Arial, sans-serif;
+      font-size: 12px;
     }
 
     ul {
       padding: 0;
       margin: 1em 0;
       list-style-type: none;
+    }
+
+    li {
+      padding: 2px 4px;
+      user-select: none;
+    }
+
+    li span {
+      width: 1em;
+      display: inline-block;
+      margin-right: 4px;
+    }
+
+    li:hover {
+      background-color: teal;
+      color: white;
     }
   `;
 
@@ -144,8 +162,8 @@ function makeChecklistElement(itemName, id) {
   li.style.cursor = "pointer";
 
   const checkmark = document.createElement("span");
-  const checked = "✓ ";
-  const unchecked = "☐ ";
+  const checked = "✓";
+  const unchecked = "☐";
 
   checkmark.textContent = isItemCompleted(id) ? checked : unchecked;
 
@@ -156,13 +174,17 @@ function makeChecklistElement(itemName, id) {
     checkmark.textContent = isCompleted ? checked : unchecked;
   });
 
-  li.addEventListener("dblclick", () => {
+  li.addEventListener("dblclick", (e) => {
+    e.preventDefault();
     const newName = prompt("Enter new name", itemName);
     if (!newName) {
       return;
     }
 
     renameChecklistItem(id, newName);
+    const checkmark = li.querySelector("span");
+    li.textContent = newName;
+    li.prepend(checkmark);
   });
 
   li.addEventListener("contextmenu", (e) => {
