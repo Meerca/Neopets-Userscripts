@@ -631,11 +631,12 @@
     }
 
     addStartCourseForm() {
+      const recommendedStat = TrainingCalculator.recommendLowestStat(
+        this.currentStats
+      );
+
       this.trainingCell.append(
-        UI.getStartCourseForm(
-          this.petName,
-          TrainingCalculator.recommendLowestStat(this.currentStats)
-        )
+        UI.getStartCourseForm(this.petName, recommendedStat)
       );
     }
 
@@ -691,6 +692,13 @@
   class TrainingCalculator {
     // excludes level because we only recommend training when necessary
     static _statNames = ["strength", "defence", "agility", "endurance"];
+
+    // to do: add UI to the course form for stat priorities and specified target values per pet for better recommendations
+    // ideas for options:
+    // - keep training last selected stat
+    //   - warn if training the stat will make training other stats more costly?
+    // - train lowest stat
+    // - create a list of specific target stats (stat + target value) and train up to those values in order
 
     /**
      * This calculates a recommended stat to train based simply on which stat value is lowest.
