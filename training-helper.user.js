@@ -2,7 +2,7 @@
 // @name         Neopets Training Helper
 // @author       Hiddenist
 // @namespace    https://hiddenist.com
-// @version      2024-08-25
+// @version      2024-10-30
 // @description  Makes codestone training your pet require fewer clicks and less math.
 // @match        https://www.neopets.com/island/fight_training.phtml*
 // @match        https://www.neopets.com/island/training.phtml*
@@ -115,8 +115,8 @@
         en: /(?<hours>\d+) ?hrs, ?(?<minutes>\d+) ?minutes, ?(?<seconds>\d+) seconds/,
         nl: /(?<hours>\d+) ?uren, ?(?<minutes>\d+) ?minuten, ?(?<seconds>\d+) seconden/,
         pt: /(?<hours>\d+) ?horas, ?(?<minutes>\d+) ?minutos, ?(?<seconds>\d+) segundos/,
-        de: /(?<hours>\d+) ?Stunden, ??<minutes>(\d+) ?Minuten, ?(?<seconds>\d+) Sekunden/,
-        fr: /(?<hours>\d+) ?hrs, ?(?<minutes>\d+) ?minutes, ?(?<seconds>\d+)secondes/,
+        de: /(?<hours>\d+) ?Stunden, ??<minutes>(\d+) ?Minuten, ?(?<seconds>\d+) Sekunden/, // does not work (because the bold tag is double nested?)
+        fr: /(?<hours>\d+) ?hrs, ?(?<minutes>\d+) ?minutes, ?(?<seconds>\d+)secondes/, // ditto ^
         it: /(?<hours>\d+) ?ore, ?(?<minutes>\d+) ?minuti, ?(?<seconds>\d+) secondi/,
         es: /(?<hours>\d+) ?hrs, ?(?<minutes>\d+) ?minutos, ?(?<seconds>\d+) segundos/,
       },
@@ -540,7 +540,7 @@
         this.trainingCell.append(
           UI.getStartCourseForm(
             this.petName,
-            TrainingCalculator.recommendNextStatToTrain(this.currentStats)
+            TrainingCalculator.recommendLowestStat(this.currentStats)
           )
         );
         return;
@@ -563,7 +563,7 @@
         window.location.reload();
       }
 
-      const nextStat = TrainingCalculator.recommendNextStatToTrain(
+      const nextStat = TrainingCalculator.recommendLowestStat(
         this.currentStats,
         increasedStatName
       );
@@ -634,7 +634,7 @@
       this.trainingCell.append(
         UI.getStartCourseForm(
           this.petName,
-          TrainingCalculator.recommendNextStatToTrain(this.currentStats)
+          TrainingCalculator.recommendLowestStat(this.currentStats)
         )
       );
     }
@@ -689,43 +689,35 @@
   }
 
   class TrainingCalculator {
+    // excludes level because we only recommend training when necessary
+    static _statNames = ["strength", "defence", "agility", "endurance"];
+
     /**
+     * This calculates a recommended stat to train based simply on which stat value is lowest.
+     *
      * @param {Record<StatName, number>>} stats
      * @returns {StatName}
      */
-    static recommendNextStatToTrain(stats, fallbackValue = "level") {
-      let lowestStat = null;
-      let highestStat = null;
+    static recommendLowestStat(stats, fallbackValue = "level") {
+      // to do: test cases for low current HP, negative stats, maxed out stats...
 
-      const statNames = ["strength", "defence", "agility", "endurance"];
+      const lowestTrainableStat =
+        TrainingCalculator._getLowestTrainableStatName(stats);
+      const highestStat = TrainingCalculator.getHighestStatName(stats);
 
-      // test cases: low current HP, negative stats, maxed out stats...
-
-      // Current logic just trains the lowest stat that isn't maxed out yet, but there's some stuff we should add for recommending training endurance up to 3x instead of when it's lowest.
-      for (const stat of statNames) {
-        if (stats[stat] > configuration.maxStats[stat]) continue;
-        if (!lowestStat || stats[stat] < stats[lowestStat]) {
-          lowestStat = stat;
-        }
-      }
-
-      for (const stat of statNames) {
-        if (!highestStat || stats[stat] > stats[highestStat]) {
-          highestStat = stat;
-        }
-      }
-
-      const mustTrainLevel =
-        (lowestStat === "endurance" && stats.endurance >= stats.level * 3) ||
-        stats[highestStat] >= stats.level * 2;
+      const mustTrainLevel = TrainingCalculator.isLevelUpRequired(
+        stats,
+        stats[highestStat],
+        lowestTrainableStat === "endurance"
+      );
 
       const recommendation = mustTrainLevel
         ? "level"
-        : lowestStat ?? fallbackValue;
+        : lowestTrainableStat ?? fallbackValue;
 
       if (DEBUG) {
         console.debug("Training Recommendation:", {
-          lowestStat,
+          lowestTrainableStat,
           highestStat,
           mustTrainLevel,
           recommendation,
@@ -733,6 +725,50 @@
       }
 
       return recommendation;
+    }
+
+    static _getLowestTrainableStatName(stats) {
+      let lowestTrainableStat = null;
+
+      for (const statName of TrainingCalculator._statNames) {
+        if (stats[statName] > configuration.maxStats[statName]) continue;
+        if (
+          !lowestTrainableStat ||
+          stats[statName] < stats[lowestTrainableStat]
+        ) {
+          lowestTrainableStat = statName;
+        }
+      }
+
+      return lowestTrainableStat;
+    }
+
+    static getHighestStatName(stats) {
+      let highestStat = null;
+
+      for (const statName of TrainingCalculator._statNames) {
+        if (!highestStat || stats[statName] > stats[highestStat]) {
+          highestStat = statName;
+        }
+      }
+
+      return highestStat;
+    }
+
+    /**
+     * Check if a level up is required before any other stats can be trained.
+     *
+     * @param {Record<StatName, number>>} stats
+     * @param {number} highestStatValue
+     * @param {boolean} isTrainingEndurance
+     * @returns
+     */
+    static isLevelUpRequired(stats, highestStatValue, isTrainingEndurance) {
+      if (isTrainingEndurance) {
+        return stats.endurance > stats.level * 3;
+      }
+
+      return highestStatValue > stats.level * 2;
     }
   }
 
@@ -869,6 +905,26 @@
     }
 
     static async searchSdb(searchTerm) {
+      //   const request = await fetch(
+      //     `/safetydeposit.phtml?obj_name=${encodeURIComponent(searchTerm)}`
+      //   );
+      //   const response = await request.text();
+      //   const dom = new DOMParser().parseFromString(response, "text/html");
+      //   const whichLang = getLang(dom);
+
+      //   const notFound =
+      //     dom.querySelector(".content p[align='center'] b")?.textContent ===
+      //     lang.neopets.notFoundInSdb[whichLang];
+
+      //   if (notFound) {
+      //     alert(lang.neopets.notFoundInSdb[whichLang]);
+      //     return dom;
+      //   }
+
+      //   return dom;
+      // }
+
+      // static openSdb(searchTerm) {
       window.open(
         `/safetydeposit.phtml?obj_name=${encodeURIComponent(searchTerm)}`
       );
