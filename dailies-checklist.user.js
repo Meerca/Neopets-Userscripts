@@ -19,8 +19,6 @@ const CHECKLIST_POSITION = "checklistPosition";
 
 function main() {
   document.body.append(makeChecklist());
-
-  console.log(GM_listValues().map((key) => ({ key, value: GM_getValue(key) })));
 }
 
 function makeChecklist() {
@@ -38,6 +36,9 @@ function makeChecklist() {
 
   const checklist = document.createElement("ul");
   const items = getChecklistItems();
+  const progress = getTodaysChecklistProgress();
+
+  container.append(progress.date);
 
   for (const id in items) {
     const item = items[id];
