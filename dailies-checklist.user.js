@@ -2,7 +2,7 @@
 // @name         Neopets: Dailies Checklist
 // @author       Hiddenist
 // @namespace    https://hiddenist.com
-// @version      2024-10-30
+// @version      2024-11-02
 // @description  Adds a checklist to the dailies page to help you keep track of which dailies you've done.
 // @match        http*://www.neopets.com/*
 // @grant        GM_getValue
