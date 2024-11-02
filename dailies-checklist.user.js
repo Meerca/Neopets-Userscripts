@@ -22,13 +22,13 @@ function main() {
 }
 
 function makeChecklist() {
-  const shadowRoot = document.createElement("div");
-  const shadow = shadowRoot.attachShadow({ mode: "open" });
+  const host = document.createElement("div");
+  const shadowRoot = host.attachShadow({ mode: "open" });
 
   const container = document.createElement("div");
   container.classList.add("hiddenist-dailies-container");
 
-  shadow.append(container);
+  shadowRoot.append(container);
 
   const header = document.createElement("h2");
   header.textContent = "Dailies Checklist";
@@ -103,11 +103,11 @@ function makeChecklist() {
     }
   `;
 
-  container.append(styles);
+  shadowRoot.append(styles);
 
   addClickAndDrag(container);
 
-  return container;
+  return host;
 }
 
 function addClickAndDrag(element) {
