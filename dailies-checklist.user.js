@@ -118,21 +118,34 @@ function addClickAndDrag(element) {
   const initialPosition = JSON.parse(GM_getValue(CHECKLIST_POSITION, "{}"));
 
   function setPosition(top, left) {
-    const rect = element.getBoundingClientRect();
-    if (rect.right > window.innerWidth) {
-      left = window.innerWidth - rect.width + "px";
+    if (typeof top === "string") {
+      top = parseInt(top);
     }
-    if (rect.bottom > window.innerHeight) {
-      top = window.innerHeight - rect.height + "px";
+    if (typeof left === "string") {
+      left = parseInt(left);
     }
 
-    element.style.top = top;
-    element.style.left = left;
+    const rect = element.getBoundingClientRect();
+    if (rect.right > window.innerWidth) {
+      left = window.innerWidth - rect.width;
+    }
+    if (rect.bottom > window.innerHeight) {
+      top = window.innerHeight - rect.height;
+    }
+    if (top < 0) {
+      top = 0;
+    }
+    if (left < 0) {
+      left = 0;
+    }
+
+    element.style.top = `${top}px`;
+    element.style.left = `${left}px`;
 
     GM_setValue(CHECKLIST_POSITION, JSON.stringify({ top, left }));
   }
 
-  setPosition(initialPosition.top ?? "16px", initialPosition.left ?? "16px");
+  setPosition(initialPosition.top ?? 16, initialPosition.left ?? 16);
 
   element.addEventListener("mousedown", (e) => {
     isDragging = true;
@@ -142,7 +155,7 @@ function addClickAndDrag(element) {
 
   document.addEventListener("mousemove", (e) => {
     if (isDragging) {
-      setPosition(e.clientY - offsetY + "px", e.clientX - offsetX + "px");
+      setPosition(e.clientY - offsetY, e.clientX - offsetX);
     }
   });
 
