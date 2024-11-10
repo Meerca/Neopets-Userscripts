@@ -245,7 +245,7 @@ function isItemCompleted(id) {
 
 function getNstDate() {
   return new Date().toLocaleDateString("en-US", {
-    timeZone: "America/New_York",
+    timeZone: "America/Los_Angeles",
   });
 }
 
