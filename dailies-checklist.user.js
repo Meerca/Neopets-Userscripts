@@ -2,7 +2,7 @@
 // @name         Neopets: Dailies Checklist
 // @author       Hiddenist
 // @namespace    https://hiddenist.com
-// @version      2024-11-09
+// @version      2024-11-20
 // @description  Adds a checklist to the dailies page to help you keep track of which dailies you've done.
 // @match        http*://www.neopets.com/*
 // @grant        GM_getValue
@@ -174,6 +174,7 @@ function makeChecklistElement(itemName, id) {
   const li = document.createElement("li");
   li.textContent = itemName;
   li.style.cursor = "pointer";
+  li.tabIndex = 0;
 
   const checkmark = document.createElement("span");
   const checked = "✓";
@@ -183,13 +184,12 @@ function makeChecklistElement(itemName, id) {
 
   li.prepend(checkmark);
 
-  li.addEventListener("click", () => {
+  const toggleCompleted = () => {
     const isCompleted = toggleItemCompleted(id);
     checkmark.textContent = isCompleted ? checked : unchecked;
-  });
+  };
 
-  li.addEventListener("dblclick", (e) => {
-    e.preventDefault();
+  const renameItem = () => {
     const newName = prompt("Enter new name", itemName);
     if (!newName) {
       return;
@@ -199,10 +199,9 @@ function makeChecklistElement(itemName, id) {
     const checkmark = li.querySelector("span");
     li.textContent = newName;
     li.prepend(checkmark);
-  });
+  };
 
-  li.addEventListener("contextmenu", (e) => {
-    e.preventDefault();
+  const removeItem = () => {
     if (
       !confirm(
         `Would you like to remove ${itemName} from your dailies checklist?`
@@ -213,6 +212,42 @@ function makeChecklistElement(itemName, id) {
 
     removeChecklistItem(id);
     li.remove();
+  };
+
+  li.addEventListener("click", toggleCompleted);
+  li.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      toggleCompleted();
+    } else if (e.key === "Delete" || e.key === "Backspace") {
+      e.preventDefault();
+      removeItem();
+    } else if (e.key === "e") {
+      e.preventDefault();
+      renameItem();
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      const previous = li.previousElementSibling;
+      if (previous) {
+        previous.focus();
+      }
+    } else if (e.key === "ArrowDown") {
+      e.preventDefault();
+      const next = li.nextElementSibling;
+      if (next) {
+        next.focus();
+      }
+    }
+  });
+
+  li.addEventListener("dblclick", (e) => {
+    e.preventDefault();
+    renameItem();
+  });
+
+  li.addEventListener("contextmenu", (e) => {
+    e.preventDefault();
+    removeItem();
   });
 
   return li;
