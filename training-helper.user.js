@@ -2,7 +2,7 @@
 // @name         Neopets Training Helper
 // @author       Hiddenist
 // @namespace    https://hiddenist.com
-// @version      2024-10-30
+// @version      2024-12-29
 // @description  Makes codestone training your pet require fewer clicks and less math.
 // @match        https://www.neopets.com/island/fight_training.phtml*
 // @match        https://www.neopets.com/island/training.phtml*
@@ -1021,12 +1021,21 @@
 
     static getNstDate() {
       const now = new Date();
-
       now.setHours(-1 * DateTimeHelpers.getNstTimezoneOffset());
-      const nstMonth = now.getUTCMonth() + 1;
-      const nstDay = now.getUTCDate();
 
-      return { month: nstMonth, day: nstDay };
+      return DateTimeHelpers.dateToMonthDay(now);
+    }
+
+    static getDaysAgoDate(daysAgo) {
+      const date = new Date();
+      date.setHours(-1 * DateTimeHelpers.getNstTimezoneOffset());
+      date.setDate(date.getDate() - daysAgo);
+
+      return DateTimeHelpers.dateToMonthDay(date);
+    }
+
+    static dateToMonthDay(date) {
+      return { month: date.getMonth() + 1, day: date.getDate() };
     }
   }
 
@@ -1066,10 +1075,13 @@
       }
 
       if (!age.hours) {
-        return age.days % 365 === 0;
+        const birthday = DateTimeHelpers.getDaysAgoDate(age.days);
+        const today = DateTimeHelpers.getNstDate();
+
+        return birthday.month === today.month && birthday.day === today.day;
       }
 
-      // test case: pet was born less than 1 day ago, but the has passed
+      // test case: pet was born less than 1 day ago, but midnight has passed
       const midnight = new Date();
       midnight.setHours(-1 * DateTimeHelpers.getNstTimezoneOffset(), 0, 0, 0);
 
