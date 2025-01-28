@@ -2,7 +2,7 @@
 // @name         Neopets Training Helper
 // @author       Hiddenist
 // @namespace    https://hiddenist.com
-// @version      2024-12-29
+// @version      2025-01-27
 // @description  Makes codestone training your pet require fewer clicks and less math.
 // @match        https://www.neopets.com/island/fight_training.phtml*
 // @match        https://www.neopets.com/island/training.phtml*
@@ -38,11 +38,12 @@
      * The maximum level to train each stat to.
      */
     maxStats: {
-      strength: 750, // Does nothing after 750
-      defence: 750, // Does nothing after 750
-      agility: 201, // Not useful after 201, only used for equipping certain items
-      endurance: Infinity,
-      level: Infinity,
+      // Currently, str and def reach their maximum boost at 850
+      strength: store.getNumericValue("maxStats.strength", 850),
+      defence: store.getNumericValue("maxStats.defence", 850),
+      agility: store.getNumericValue("maxStats.agility", 201), // The Heavy Robe of Thievery requires 201 agility to equip. However, it doesn't function currently!
+      endurance: store.getNumericValue("maxStats.endurance", Infinity),
+      level: store.getNumericValue("maxStats.level", Infinity),
     },
     /** @private */
     _isConfigPanelOpen: store.getValue("isConfigPanelOpen", false),
@@ -1527,6 +1528,12 @@
           border-radius: 4px;
         }
 
+        fieldset.stats {
+          display: grid;
+          grid-template-columns: repeat(2, 1fr);
+          gap: 8px;
+        }
+
         fieldset {
           padding: 16px;
           background: #fefefe;
@@ -1651,6 +1658,62 @@
         },
       };
 
+      function getStatInputValue(statName) {
+        const value = configuration.maxStats[statName];
+        return value === Infinity ? -1 : value;
+      }
+
+      function debounce(fn, ms) {
+        let timeout;
+        return function () {
+          clearTimeout(timeout);
+          timeout = setTimeout(() => fn.apply(this, arguments), ms);
+        };
+      }
+
+      const showSavedMessage = debounce(() => {
+        statusMessage.show({
+          message: `Max stats updated`,
+          element: form,
+          type: "success",
+        });
+      }, 300);
+
+      function setStatValue(e, statName) {
+        const value = e.target.value === "-1" ? Infinity : Number(e.target.value);
+
+        if (isNaN(value) || value < 0) {
+          statusMessage.show({
+            message: `Invalid value for ${statName}`,
+            element: form,
+            type: "error",
+          });
+          e.target.value = getStatInputValue(statName);
+          return;
+        }
+
+        if (value === configuration.maxStats[statName]) return;
+
+        configuration.maxStats[statName] = value;
+        store.setValue(`maxStats.${statName}`, value);
+        
+        showSavedMessage();
+      }
+
+      const createStatInput = (label, statName) => UI.createInput({
+        label: label,
+        type: "number",
+        min: -1,
+        step: 1,
+        size: 3,
+        value: getStatInputValue(statName),
+        listeners: {
+          change(e) {
+            setStatValue(e, statName);
+          },
+        },
+      })
+ 
       const form = UI.createElement("div", {
         className: "training-helper-configuration",
         children: [
@@ -1720,6 +1783,22 @@
                     }
                   },
                 },
+              }),
+            ],
+          }),
+          UI.createElement("fieldset", {
+            className: "stats",
+            children: [
+              UI.createElement("legend", {
+                textContent: "Maximum Stat Targets",
+              }),
+              createStatInput("Strength", "strength"),
+              createStatInput("Defence", "defence"),
+              createStatInput("Agility", "agility"),
+              createStatInput("Endurance", "endurance"),
+              UI.createElement("div", {
+                style: "grid-column: span 2; text-align: center; margin-top: 8px;",
+                textContent: "Set to -1 for no limit.",
               }),
             ],
           }),
@@ -1995,6 +2074,7 @@
   /**
    * @typedef {Object} Storage
    * @property {function(string, string): string} getValue
+   * @property {function(string, number): number} getNumericValue
    * @property {function(string, string): void} setValue
    * @property {function(string): void} deleteValue
    *
@@ -2007,6 +2087,10 @@
     ) {
       return Object.freeze({
         getValue(key, defaultValue) {
+          if (typeof defaultValue === "number") {
+            return this.getNumericValue(key, defaultValue);
+          }
+
           const value = GM_getValue(key, JSON.stringify(defaultValue));
 
           if (typeof value !== "string") {
@@ -2020,8 +2104,16 @@
             return defaultValue;
           }
         },
+        getNumericValue(key, defaultValue) {
+          const value = Number(GM_getValue(key, defaultValue.toString()));
+          return isNaN(value) ? defaultValue : value;
+        },
         setValue(key, value) {
-          GM_setValue(key, JSON.stringify(value));
+          if (typeof value === "number") {
+            GM_setValue(key, value.toString());
+          } else {
+            GM_setValue(key, JSON.stringify(value));
+          }
         },
         deleteValue(key) {
           GM_deleteValue(key);
