@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Neopets Fancy Quickstock
 // @namespace    https://hiddenist.com
-// @version      2024-07-19
+// @version      2026-04-16
 // @description  Adds item images and information to the quickstock page after caching data from the inventory page.
 // @author       Hiddenist
 // @match        https://www.neopets.com/quickstock.phtml*
@@ -36,6 +36,11 @@
         debug("Finished caching all item data.");
       });
     } else if (isQuickStockPage()) {
+      // Quickstock is now paginated and it loads in dynamically, so need to
+      // observe the table to keep an eye out for changes.
+      observeQuickstockTable();
+
+      // But the initial page still needs images added!
       debug("Adding images to quickstock...");
       addImagesToQuickStock();
       debug("Finished adding images to quickstock.");
@@ -127,8 +132,30 @@
     return value ? JSON.parse(value) : null;
   }
 
+  function observeQuickstockTable() {
+    const observer = new MutationObserver((records) => {
+      for (const record of records) {
+        if (record.target === 'childList' && !record.nextSibling) {
+          observer.disconnect();
+        }
+      }
+
+      addImagesToQuickStock();
+    });
+
+    observer.observe(document.querySelector('.quickstock-table'), {
+      childList: true,
+      subtree: true,
+    });
+  }
+
   function addImagesToQuickStock() {
     const items = getQuickstockItems();
+    if (!items.length) {
+      debug("No items in quick stock.");
+      return;
+    }
+
     items.forEach(addImageToQuickstockItem);
   }
 
@@ -160,10 +187,12 @@
       return [];
     }
 
-    // The header and check all rows bgcolors don't start with #f, so as long as they never change it....... lolol
-    const rows = form.querySelectorAll("tr[bgcolor^='#f']");
-
+    // Quickstock update: rows all have this class. Including the empty row
+    // separating the Neopoint items from the NeoCash ones. And the NeoCash
+    // items. And the row with the "check all" options. BUT WHATEVER.
+    const rows = form.querySelectorAll('.np-table-row');
     const items = [];
+
     rows.forEach((row) => {
       const name = row.querySelector("td").textContent.trim();
       const itemData = loadItemData(name);
@@ -213,6 +242,15 @@
     textContainer.style.gap = "4px";
 
     textContainer.innerHTML = itemData.flags;
+
+    if (itemData.isNc) {
+      // Weird one: NC items are now indicated by an invisible span.
+      const ncIndicator = document.createElement('span');
+      ncIndicator.classList = 'qs-cash-marker';
+      ncIndicator.style.display = 'none';
+
+      textContainer.prepend(ncIndicator);
+    }
 
     const name = document.createElement("span");
     name.textContent = item.name;
